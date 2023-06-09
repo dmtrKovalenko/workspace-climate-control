@@ -1,0 +1,25 @@
+{
+	"folders": [
+		{
+			"path": "cli"
+		},
+		{
+			"path": "core"
+		},
+		{
+			"path": "windows"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.prisma": "graphql",
+			"array": "cpp",
+			"limits": "cpp",
+			"type_traits": "cpp",
+			"*.inc": "cpp"
+		},
+		"cSpell.words": [
+			"tvoc"
+		]
+	}
+}

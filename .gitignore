@@ -2,3 +2,5 @@ target/
 .pio/
 .DS_Store
 *.log
+compile_commands.json
+.cache/

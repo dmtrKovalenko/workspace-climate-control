@@ -6,12 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = "0.1.68"
 btleplug = { version = "0.10", features = ["serde"] }
 chrono = "0.4.24"
 crossterm = "0.26.1"
 futures = "0.3.28"
+lazy_static = "1.4.0"
 notify-rust = "4.8.0"
 pretty_env_logger = "0.4.0"
+serde = { version = "1.0.193", features = ["derive"] }
+serde_json = "1.0.108"
 spinners = "4.1.0"
 textplots = "0.8.0"
 throbber-widgets-tui = "0.1.3"

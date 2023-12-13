@@ -1,58 +1,62 @@
-#include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include "ccs811.h"          // include library for CCS811 - Sensor from martin-pennings https://github.com/maarten-pennings/CCS811
-#include "Adafruit_Si7021.h" // include main library for SI7021 - Sensor
 #include "Adafruit_BMP280.h" // include main library for BMP280 - Sensor
+#include "Adafruit_Si7021.h" // include main library for SI7021 - Sensor
+#include "MHZ19.h"
+#include "ccs811.h"
+#include "i2c_scanner.h"
+#include <Adafruit_Sensor.h>
+#include <Arduino.h>
+#include <BH1750.h>
+#include <BLE2902.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
-#include <BLE2902.h>
-#include <BH1750.h>
-#include "i2c_scanner.h"
+#include <FirebaseJson.h>
+#include <Wire.h>
+
+#define BAUDRATE 9600
 
 // DHT dht(DHTPIN, DHTTYPE);
 CCS811 ccs811;
 Adafruit_BMP280 bmp280; // I2C
 Adafruit_Si7021 SI702x = Adafruit_Si7021();
 BH1750 lightSensor(0x23);
+MHZ19 myMHZ19;
+
+HardwareSerial mySerial(2);
 
 BLECharacteristic *pCharacteristic;
 bool deviceConnected = false;
 
-class MyServerCallbacks : public BLEServerCallbacks
-{
-  void onConnect(BLEServer *pServer)
-  {
+class MyServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer *pServer) {
     deviceConnected = true;
     Serial.println("***** Connect");
   }
 
-  void onDisconnect(BLEServer *pServer)
-  {
+  void onDisconnect(BLEServer *pServer) {
     Serial.println("***** Disconnect");
     deviceConnected = false;
     pServer->getAdvertising()->start();
   }
 };
 
-void setup()
-{
-  Serial.begin(115200);
+void setup() {
+  Serial.begin(9600);
 
   Serial.println("DHT22 Temperature and Humidity Sensor");
   Serial.println("------------------------------------");
 
   Wire.begin(21, 22); // Configure I2C pins (SDA: GPIO 21, SCL: GPIO 22)
   Wire1.begin(26, 25);
+  mySerial.begin(BAUDRATE); // sensor serial
 
-  if (!lightSensor.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &Wire1))
-  {
+  if (!lightSensor.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &Wire1)) {
     Serial.println("Error initializing BH1750");
   }
 
-  ccs811.set_i2cdelay(50); // Needed for ESP8266 because it doesn't handle I2C clock stretch correctly
-  if (!ccs811.begin())
-  {
+  ccs811.set_i2cdelay(50); // Needed for ESP8266 because it doesn't handle I2C
+                           // clock stretch correctly
+  if (!ccs811.begin()) {
     Serial.println("Failed to start CSS811! Please check your wiring.");
   }
 
@@ -69,20 +73,17 @@ void setup()
     Serial.println("setup: CCS811 start FAILED");
 
   Serial.println("BMP280 test"); /* --- SETUP BMP on 0x76 ------ */
-  if (!bmp280.begin(0x76))
-  {
+  if (!bmp280.begin(0x76)) {
     Serial.println("Could not find a valid BMP280 sensor, check wiring!");
   }
 
   Serial.println("Si7021 test!"); /* ---- SETUP SI702x ----- */
-  if (!SI702x.begin())
-  {
+  if (!SI702x.begin()) {
     Serial.println("Did not find Si702x sensor!");
   }
 
   Serial.print("Found model ");
-  switch (SI702x.getModel())
-  {
+  switch (SI702x.getModel()) {
   case SI_Engineering_Samples:
     Serial.print("SI engineering samples");
     break;
@@ -106,6 +107,9 @@ void setup()
   Serial.print(SI702x.sernum_a, HEX);
   Serial.println(SI702x.sernum_b, HEX);
 
+  myMHZ19.begin(mySerial);
+  myMHZ19.autoCalibration(true);
+
   // Wait for the sensors to stabilize
   delay(2000);
 
@@ -114,13 +118,13 @@ void setup()
 
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
-  BLEService *pService = pServer->createService(BLEUUID("0000FFE0-0000-1000-8000-00805F9B34FB"));
+  BLEService *pService =
+      pServer->createService(BLEUUID("0000FFE0-0000-1000-8000-00805F9B34FB"));
 
   // Create a BLE Characteristic
   pCharacteristic = pService->createCharacteristic(
       BLEUUID("0000FFE1-0000-1000-8000-00805F9B34FB"),
-      BLECharacteristic::PROPERTY_READ |
-          BLECharacteristic::PROPERTY_NOTIFY);
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 
   pCharacteristic->addDescriptor(new BLE2902());
   pService->start();
@@ -131,8 +135,15 @@ void setup()
   pAdvertising->start();
 }
 
-void loop()
-{
+void loop() {
+  int CO2 = myMHZ19.getCO2();
+  int8_t Temp = myMHZ19.getTemperature(); // Request Temperature (as Celsius)
+
+  Serial.print("CO2 (ppm): ");
+  Serial.println(CO2);
+  Serial.print("MHZ19 => Temperature (C): ");
+  Serial.println(Temp);
+
   float lightIntensity = lightSensor.readLightLevel();
   Serial.print("Light Intensity: ");
   Serial.print(lightIntensity);
@@ -160,16 +171,36 @@ void loop()
 
   ccs811.set_envdata(temperature, humidity);
   ccs811.read(&eco2, &etvoc, &errstat, &raw);
-  if (errstat == CCS811_ERRSTAT_OK)
-  {
+  if (errstat == CCS811_ERRSTAT_OK) {
     Serial.print("CCS811 => CO2 = ");
     Serial.print(eco2);
     Serial.print("ppm, TVOC = ");
     Serial.println(etvoc);
   }
 
-  String sensorData = String(eco2) + "," + String(etvoc) + "," + String(temperature) + "," + String(pressure) + "," + String(humidity) + "," + String(lightIntensity);
-  pCharacteristic->setValue(sensorData.c_str());
+  FirebaseJson json;
+
+  if (CO2 && Temp) {
+    json.add("co2", CO2);
+    json.add("tempereture_of_co2_sensor", Temp);
+  }
+
+  if (lightIntensity > 0) {
+    json.add("light", lightIntensity);
+  }
+
+  if (temperature && pressure && humidity) {
+    json.add("temperature", temperature);
+    json.add("pressure", pressure);
+    json.add("humidity", humidity);
+  }
+
+  json.add("eco2", eco2);
+  json.add("etvoc", etvoc);
+
+  json.toString(Serial, true);
+
+  pCharacteristic->setValue(json.raw());
   pCharacteristic->notify();
 
   delay(5000);

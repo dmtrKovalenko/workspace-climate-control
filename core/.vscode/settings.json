@@ -1,9 +1,0 @@
-{
-  "files.associations": {
-    "*.prisma": "graphql",
-    "array": "cpp",
-    "limits": "cpp",
-    "type_traits": "cpp",
-    "*.inc": "cpp"
-  }
-}

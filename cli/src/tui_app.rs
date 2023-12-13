@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode};
+use crate::climate_data::ClimateData;
 use std::error::Error;
 use tui::{
     backend::Backend,
@@ -9,16 +9,14 @@ use tui::{
     widgets::{Axis, Block, Borders, Chart, Dataset, Paragraph, Wrap},
     Frame, Terminal,
 };
-
-use crate::bluetooth::ClimateData;
-
 pub enum UiState {
     Spinner(String),
     Connected,
 }
 
 pub struct TerminalUi {
-    data: Vec<(f64, f64)>,
+    co2_history: Vec<(f64, f64)>,
+    eco2_history: Vec<(f64, f64)>,
     last_climate_data: Option<ClimateData>,
     window: [f64; 2],
     state: UiState,
@@ -29,20 +27,24 @@ impl TerminalUi {
         let now = chrono::offset::Local::now().timestamp_millis() as f64;
 
         Ok(Self {
-            data: vec![],
+            eco2_history: vec![],
+            co2_history: vec![],
             window: [now, now],
             last_climate_data: None,
             state: UiState::Spinner("Connecting to sensor...".to_string()),
         })
     }
 
-    pub fn capture_measurements(&mut self, climate_data: ClimateData) {
+    pub fn capture_measurements(&mut self, climate_data: &ClimateData) {
         let now = chrono::offset::Local::now().timestamp_millis();
 
         self.state = UiState::Connected;
-        self.data.push((now as f64, climate_data.e_co2 as f64));
+        self.eco2_history
+            .push((now as f64, climate_data.eco2 as f64));
+        self.co2_history.push((now as f64, climate_data.co2 as f64));
+
         self.window[1] = now as f64;
-        self.last_climate_data = Some(climate_data);
+        self.last_climate_data = Some(*climate_data);
     }
 
     fn render_dashboard<B: Backend>(&self, f: &mut Frame<B>) {
@@ -75,17 +77,25 @@ impl TerminalUi {
                 Style::default().add_modifier(Modifier::BOLD),
             ),
         ];
-        let datasets = vec![Dataset::default()
-            .name("ppm")
-            .marker(symbols::Marker::Dot)
-            .style(Style::default().fg(Color::Cyan))
-            .data(&app.data)];
+
+        let datasets = vec![
+            Dataset::default()
+                .name("eCO2 ppm")
+                .marker(symbols::Marker::Dot)
+                .style(Style::default().fg(Color::Magenta))
+                .data(&app.eco2_history),
+            Dataset::default()
+                .name("CO2 ppm")
+                .marker(symbols::Marker::Dot)
+                .style(Style::default().fg(Color::Cyan))
+                .data(&app.co2_history),
+        ];
 
         let chart = Chart::new(datasets)
             .block(
                 Block::default()
                     .title(Span::styled(
-                        " eCO2 ppm ",
+                        " CO2 ppm ",
                         Style::default()
                             .fg(Color::Cyan)
                             .add_modifier(Modifier::BOLD),
@@ -105,9 +115,9 @@ impl TerminalUi {
                     .style(Style::default().fg(Color::Gray))
                     .labels(vec![
                         Span::styled("400", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::styled("1400.0", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled("2000.0", Style::default().add_modifier(Modifier::BOLD)),
                     ])
-                    .bounds([400.0, 1400.0]),
+                    .bounds([400.0, 2000.0]),
             );
         f.render_widget(chart, chunks[1]);
     }
@@ -123,7 +133,7 @@ impl TerminalUi {
         ];
 
         let block = Paragraph::new(text)
-            .block(Block::default().title("Paragraph").borders(Borders::ALL))
+            .block(Block::default().title(title).borders(Borders::ALL))
             .style(Style::default().fg(Color::White).bg(Color::Black))
             .alignment(Alignment::Center)
             .wrap(Wrap { trim: true });
@@ -152,18 +162,6 @@ impl TerminalUi {
             .unwrap();
     }
 
-    pub fn poll_interactions(&self, timeout: core::time::Duration) {
-        loop {
-            if crossterm::event::poll(timeout).unwrap() {
-                if let Event::Key(key) = event::read().unwrap() {
-                    if let KeyCode::Char('q') = key.code {
-                        std::process::exit(0);
-                    }
-                }
-            }
-        }
-    }
-
     fn render_overview<B: Backend>(
         &self,
         last_climate_data: &ClimateData,
@@ -171,6 +169,31 @@ impl TerminalUi {
         chunks: &[layout::Rect],
     ) {
         let text = vec![
+            Spans::from(vec![
+                Span::from("CO2: "),
+                Span::styled(
+                    format!("{} ppm ", last_climate_data.co2),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::from(match last_climate_data.co2 {
+                    co2 if co2 > 1000 => "🥵",
+                    co2 if co2 > 800 => "😨",
+                    co2 if co2 > 600 => "😗",
+                    co2 if co2 > 400 => "😊",
+                    _ => "😌",
+                }),
+            ]),
+            Spans::from(vec![
+                Span::from("eCO2: "),
+                Span::styled(
+                    format!("{} ppm", last_climate_data.eco2),
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
             Spans::from(vec![
                 Span::from("Temperature: "),
                 Span::styled(
@@ -199,32 +222,23 @@ impl TerminalUi {
             Spans::from(vec![
                 Span::from("TVOC: "),
                 Span::styled(
-                    format!("{} ppb", last_climate_data.tvoc),
+                    format!("{} ppb", last_climate_data.etvoc),
                     Style::default()
                         .fg(Color::Gray)
                         .add_modifier(Modifier::BOLD),
                 ),
             ]),
             Spans::from(vec![
-                Span::from("eCO2: "),
-                Span::styled(
-                    format!("{} ppm", last_climate_data.e_co2),
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]),
-            Spans::from(vec![
                 Span::from("Light: "),
                 Span::styled(
-                    format!("{} lux ", last_climate_data.light),
+                    format!("{} lux ", last_climate_data.light.unwrap_or(0.0)),
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::from(match last_climate_data.light {
-                    light if light > 400.0 => "🌞",
-                    light if light > 100.0 => "️⛅",
+                    Some(light) if light > 400.0 => "🌞",
+                    Some(light) if light > 100.0 => "️⛅",
                     _ => "🌚",
                 }),
             ]),

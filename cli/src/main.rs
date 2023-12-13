@@ -28,7 +28,16 @@ fn set_terminal_title(climate_data: &ClimateData) {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt::init();
+    let home_dir = std::env::var("HOME").expect("HOME env variable is not set");
+    let file_appender =
+        tracing_appender::rolling::hourly(format!("{home_dir}/.local/state/co2"), "cli.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    tracing_subscriber::fmt()
+        .with_writer(non_blocking)
+        .with_max_level(tracing::Level::DEBUG)
+        .pretty()
+        .init();
 
     let stdout = std::io::stdout();
     let backend = CrosstermBackend::new(stdout);

@@ -8,7 +8,6 @@ mod bluetooth;
 use std::error::Error;
 use tui::{backend::CrosstermBackend, Terminal};
 
-use crate::reactions::run_reactions;
 mod climate_data;
 mod reactions;
 
@@ -21,7 +20,10 @@ fn set_terminal_title(climate_data: &ClimateData) {
         "\x1B]0;T {}°C; CO2 {} ppm; H {:.1}%\x07",
         climate_data.temperature, climate_data.co2, climate_data.humidity
     );
-    std::io::stdout().flush().unwrap();
+
+    if let Err(e) = std::io::stdout().flush() {
+        tracing::error!("Failed to update title of the console: {:?}", e);
+    }
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -56,7 +58,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     app.draw(&mut terminal);
                     history.push(data);
 
-                    run_reactions(&history);
+                    if cfg!(debug_assertions) {
+                        reactions::run_reactions(&history);
+                    }
                 })
                 .await
             {

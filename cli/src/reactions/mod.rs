@@ -21,4 +21,4 @@ macro_rules! define_reactions {
     };
 }
 
-define_reactions!(WindowData);
+define_reactions!(WindowState);

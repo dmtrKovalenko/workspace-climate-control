@@ -7,9 +7,6 @@ use std::time::Duration;
 use tokio::time::{self, sleep, timeout};
 use uuid::Uuid;
 
-/// Only devices whose name contains this string will be tried.
-const PERIPHERAL_NAME_MATCH_FILTER: &str = "CO2CICKA";
-
 pub struct Connection<TPeripheral: Peripheral> {
     _manager: Manager,
     peripheral: TPeripheral,
@@ -42,14 +39,19 @@ impl<TPer: Peripheral> Connection<TPer> {
             }
         }
 
-        loop {
+        for _ in 1..10 {
+            const DISCONNECT_INTERVAL: Duration = Duration::from_secs(2);
+
             if let Err(e) = timeout(TIMEOUT, self.disconnect()).await {
-                tracing::error!("Error while disconnecting: {e:?}. Will try again in 5 seconds");
+                tracing::error!(
+                    "Error while disconnecting: {e:?}. Will try again in {} seconds",
+                    DISCONNECT_INTERVAL.as_secs()
+                );
             } else {
                 break;
             }
 
-            sleep(Duration::from_secs(5)).await;
+            sleep(DISCONNECT_INTERVAL).await;
         }
     }
 
@@ -93,6 +95,7 @@ impl<TPer: Peripheral> Connection<TPer> {
 }
 
 pub async fn find_sensor(
+    name: &str,
     characteristic_uuid: Uuid,
     property: CharPropFlags,
 ) -> Result<Connection<impl Peripheral>, Box<dyn Error>> {
@@ -122,7 +125,7 @@ pub async fn find_sensor(
                 tracing::debug!("Connected to peripheral {:?}.", &local_name);
 
                 // Check if it's the peripheral we want.
-                if local_name.contains(PERIPHERAL_NAME_MATCH_FILTER) {
+                if local_name.contains(name) {
                     if !is_connected {
                         // Connect if we aren't already connected.
                         if let Err(err) = peripheral.connect().await {

@@ -4,7 +4,7 @@ use std::error::Error;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct ClimateData {
-    pub co2: i32,
+    pub co2: Option<i32>,
     pub temperature: f32,
     pub eco2: i16,
     pub etvoc: i16,

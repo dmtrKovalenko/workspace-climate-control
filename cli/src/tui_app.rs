@@ -41,7 +41,8 @@ impl TerminalUi {
         self.state = UiState::Connected;
         self.eco2_history
             .push((now as f64, climate_data.eco2 as f64));
-        self.co2_history.push((now as f64, climate_data.co2 as f64));
+        self.co2_history
+            .push((now as f64, climate_data.co2.unwrap_or(400) as f64));
 
         self.window[1] = now as f64;
         self.last_climate_data = Some(*climate_data);
@@ -172,17 +173,18 @@ impl TerminalUi {
             Spans::from(vec![
                 Span::from("CO2: "),
                 Span::styled(
-                    format!("{} ppm ", last_climate_data.co2),
+                    format!("{} ppm ", last_climate_data.co2.unwrap_or(400)),
                     Style::default()
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::from(match last_climate_data.co2 {
-                    co2 if co2 > 1000 => "🥵",
-                    co2 if co2 > 800 => "😨",
-                    co2 if co2 > 600 => "😗",
-                    co2 if co2 > 400 => "😊",
-                    _ => "😌",
+                    Some(co2) if co2 > 1000 => "🥵",
+                    Some(co2) if co2 > 800 => "😨",
+                    Some(co2) if co2 > 600 => "😗",
+                    Some(co2) if co2 > 400 => "😊",
+                    Some(_) => "😌",
+                    None => "🤷",
                 }),
             ]),
             Spans::from(vec![

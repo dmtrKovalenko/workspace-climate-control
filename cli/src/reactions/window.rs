@@ -28,6 +28,7 @@ impl WindowState {
     async fn find_connection() -> Result<bluetooth::Connection<impl Peripheral>, Box<dyn Error>> {
         for _ in 0..30 {
             match bluetooth::find_sensor(
+                "CO2CICKA WINDOWS",
                 WINDOWS_CHARACTERISTIC_UUID,
                 CharPropFlags::NOTIFY | CharPropFlags::READ,
             )
@@ -66,7 +67,6 @@ impl DataReaction<f32> for WindowState {
     fn only_if(latest_data: &ClimateData) -> bool {
         tracing::debug!("Check if required to check window data");
         let hour = chrono::Local::now().hour();
-
 
         hour > 8 && hour < 20 && latest_data.light.unwrap_or(0.0) > 800.
     }

@@ -5,7 +5,7 @@ use spinners::{Spinner, Spinners};
 use tui_app::TerminalUi;
 use uuid::Uuid;
 mod bluetooth;
-use std::error::Error;
+use std::{error::Error, fmt::Display};
 use tui::{backend::CrosstermBackend, Terminal};
 
 mod climate_data;
@@ -13,14 +13,10 @@ mod reactions;
 
 const CORE_CHARACTERISTIC_UUID: Uuid = Uuid::from_u128(0x0000FFE1_0000_1000_8000_00805F9B34FB);
 
-fn set_terminal_title(climate_data: &ClimateData) {
+fn set_terminal_tab_title(climate_data: impl AsRef<str> + Display) {
     use std::io::Write;
 
-    print!(
-        "\x1B]0;T {}°C; CO2 {} ppm; H {:.1}%\x07",
-        climate_data.temperature, climate_data.co2, climate_data.humidity
-    );
-
+    print!("\x1B]0;{}\x07", climate_data);
     if let Err(e) = std::io::stdout().flush() {
         tracing::error!("Failed to update title of the console: {:?}", e);
     }
@@ -28,9 +24,7 @@ fn set_terminal_title(climate_data: &ClimateData) {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let home_dir = std::env::var("HOME").expect("HOME env variable is not set");
-    let file_appender =
-        tracing_appender::rolling::hourly(format!("{home_dir}/.local/state/co2"), "cli.log");
+    let file_appender = tracing_appender::rolling::hourly(format!("/tmp/co2cicka"), "cli.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::fmt()
@@ -48,13 +42,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         let mut spinner = Spinner::new(Spinners::Dots9, "Connecting to sensor".to_owned());
         tracing::debug!("Looking for a sensor...");
+        set_terminal_tab_title("Connecting to a sensor...");
 
-        if let Ok(connection) =
-            bluetooth::find_sensor(CORE_CHARACTERISTIC_UUID, CharPropFlags::NOTIFY).await
+        if let Ok(connection) = bluetooth::find_sensor(
+            "CO2CICKA Sensor",
+            CORE_CHARACTERISTIC_UUID,
+            CharPropFlags::NOTIFY,
+        )
+        .await
         {
             let mut spinner_stopped = false;
             match connection
-                .subscribe_to_sensor(|data| {
+                .subscribe_to_sensor(|data: ClimateData| {
                     tracing::debug!("New climate data: {:?}", data);
                     if !spinner_stopped {
                         spinner.stop();
@@ -62,7 +61,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         spinner_stopped = true
                     }
 
-                    set_terminal_title(&data);
+                    set_terminal_tab_title(format!(
+                        "T {}°C; CO2 {} ppm; H {}%",
+                        data.temperature,
+                        data.co2.unwrap_or(400),
+                        data.humidity.round()
+                    ));
+
                     app.capture_measurements(&data);
                     app.draw(&mut terminal);
                     history.push(data);
@@ -75,7 +80,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("Connection error. Trying to reconnect: {e:?}");
+                    tracing::error!(error=?e, "Error while subscribing to sensor");
                 }
             }
 

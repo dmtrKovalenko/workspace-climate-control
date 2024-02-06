@@ -2,6 +2,7 @@
 #include "Adafruit_Si7021.h" // include main library for SI7021 - Sensor
 #include "MHZ19.h"
 #include "ccs811.h"
+#include "esp_sleep.h"
 #include "i2c_scanner.h"
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
@@ -15,7 +16,6 @@
 
 #define BAUDRATE 9600
 
-// DHT dht(DHTPIN, DHTTYPE);
 CCS811 ccs811;
 Adafruit_BMP280 bmp280; // I2C
 Adafruit_Si7021 SI702x = Adafruit_Si7021();
@@ -41,14 +41,14 @@ class MyServerCallbacks : public BLEServerCallbacks {
 };
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(BAUDRATE);
 
   Serial.println("DHT22 Temperature and Humidity Sensor");
   Serial.println("------------------------------------");
 
-  Wire.begin(21, 22); // Configure I2C pins (SDA: GPIO 21, SCL: GPIO 22)
-  Wire1.begin(26, 25);
-  mySerial.begin(BAUDRATE); // sensor serial
+  Wire.begin(21, 22);
+  Wire1.begin(25, 26);
+  mySerial.begin(BAUDRATE);
 
   if (!lightSensor.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &Wire1)) {
     Serial.println("Error initializing BH1750");
@@ -82,24 +82,6 @@ void setup() {
     Serial.println("Did not find Si702x sensor!");
   }
 
-  Serial.print("Found model ");
-  switch (SI702x.getModel()) {
-  case SI_Engineering_Samples:
-    Serial.print("SI engineering samples");
-    break;
-  case SI_7013:
-    Serial.print("Si7013");
-    break;
-  case SI_7020:
-    Serial.print("Si7020");
-    break;
-  case SI_7021:
-    Serial.print("Si7021");
-    break;
-  case SI_UNKNOWN:
-  default:
-    Serial.print("Unknown");
-  }
   Serial.print(" Revision(");
   Serial.print(SI702x.getRevision());
   Serial.print(")");
@@ -160,12 +142,11 @@ void loop() {
   Serial.println(" Pa, ");
 
   float humidity = SI702x.readHumidity() + 5;
-
   Serial.print("SI702x => Temperature = ");
   Serial.print(SI702x.readTemperature(), 2);
   Serial.print(" °C, ");
   Serial.print("Humidity = ");
-  Serial.println(SI702x.readHumidity(), 2);
+  Serial.println(humidity, 2);
 
   uint16_t eco2, etvoc, errstat, raw; // Read CCS811
 
@@ -179,8 +160,7 @@ void loop() {
   }
 
   FirebaseJson json;
-
-  if (CO2 && Temp) {
+  if (CO2 > -1 && Temp > -1) {
     json.add("co2", CO2);
     json.add("tempereture_of_co2_sensor", Temp);
   }

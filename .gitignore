@@ -4,3 +4,4 @@ target/
 *.log
 compile_commands.json
 .cache/
+.env*

@@ -1,0 +1,52 @@
+[package]
+name = "to2-firmware"
+version = "0.1.0"
+authors = ["Dmitriy Kovalenko <dmtr.kovalenko@outlook.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+esp-backtrace = { version = "0.11.0", features = [
+    "esp32",
+    "exception-handler",
+    "panic-handler",
+    "println",
+] }
+esp-hal = { version = "0.17.0", features = [ "esp32" ] }
+esp-println = { version = "0.9.0", features = ["esp32", "log"] }
+log = { version = "0.4.20" }
+esp-alloc = { version = "0.3.0" }
+embedded-svc = { version = "0.26.1", default-features = false, features = [] }
+embedded-io = "0.6.1"
+esp-wifi = { version = "0.5.0", features = [
+    "esp32",
+    "phy-enable-usb",
+    "utils",
+    "wifi",
+] }
+heapless = { version = "0.8.0", default-features = false }
+smoltcp = { version = "0.11.0", default-features = false, features = [
+    "medium-ethernet",
+    "proto-dhcpv4",
+    "proto-igmp",
+    "proto-ipv4",
+    "socket-dhcpv4",
+    "socket-icmp",
+    "socket-raw",
+    "socket-tcp",
+    "socket-udp",
+] }
+bh1750-ehal = "0.0.2"
+[profile.dev]
+# Rust debug is too slow. 
+# For debug builds always builds with some optimization
+opt-level = "s"
+
+[profile.release]
+codegen-units = 1 # LLVM can perform better optimizations using a single thread
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false

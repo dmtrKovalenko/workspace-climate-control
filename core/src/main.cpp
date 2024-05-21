@@ -75,6 +75,7 @@ void setup() {
     mhZ19.begin(mySerial);
   };
 
+  delay(2000);
   mhZ19.calibrate();
   bleProtocol.setup(pSensors{&mhZ19});
 }

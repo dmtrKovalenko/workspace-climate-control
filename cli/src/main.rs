@@ -1,12 +1,14 @@
+mod history;
 mod tui_app;
 use btleplug::api::CharPropFlags;
 use climate_data::ClimateData;
+use history::History;
 use spinners::{Spinner, Spinners};
 use tui_app::TerminalUi;
 use uuid::Uuid;
 mod bluetooth;
+use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{error::Error, fmt::Display};
-use tui::{backend::CrosstermBackend, Terminal};
 
 mod climate_data;
 mod reactions;
@@ -24,7 +26,7 @@ fn set_terminal_tab_title(climate_data: impl AsRef<str> + Display) {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let file_appender = tracing_appender::rolling::hourly(format!("/tmp/co2cicka"), "cli.log");
+    let file_appender = tracing_appender::rolling::hourly("/tmp/co2cicka", "cli.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::fmt()
@@ -35,11 +37,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let stdout = std::io::stdout();
     let backend = CrosstermBackend::new(stdout);
+    let mut history = History::new();
     let mut app = TerminalUi::new()?;
     let mut terminal = Terminal::new(backend)?;
-    let mut history = Vec::new();
 
     loop {
+        let mut spinner_stopped = false;
         let mut spinner = Spinner::new(Spinners::Dots9, "Connecting to sensor".to_owned());
         tracing::debug!("Looking for a sensor...");
         set_terminal_tab_title("Connecting to a sensor...");
@@ -51,8 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .await
         {
-            let mut spinner_stopped = false;
-            match connection
+            let result = connection
                 .subscribe_to_sensor(|data: ClimateData| {
                     tracing::debug!("New climate data: {:?}", data);
                     if !spinner_stopped {
@@ -68,16 +70,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         data.humidity.round()
                     ));
 
+                    history.capture_measurement(&data);
+
                     app.capture_measurements(&data);
-                    app.draw(&mut terminal);
-                    history.push(data);
+                    app.draw(&history, &mut terminal);
 
                     if cfg!(debug_assertions) {
-                        reactions::run_reactions(&history);
+                        reactions::run_reactions(history.flat.as_slice());
                     }
                 })
-                .await
-            {
+                .await;
+
+            match result {
                 Ok(_) => {}
                 Err(e) => {
                     tracing::error!(error=?e, "Error while subscribing to sensor");

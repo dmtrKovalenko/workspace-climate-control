@@ -53,7 +53,7 @@ impl WindowState {
 
 #[async_trait::async_trait]
 impl DataReaction<f32> for WindowState {
-    const PERIOD: Duration = Duration::from_secs(60);
+    const PERIOD: Duration = Duration::from_secs(3600);
     const TREND: Trend = Trend::Up;
 
     fn get_value(data: &ClimateData) -> f32 {

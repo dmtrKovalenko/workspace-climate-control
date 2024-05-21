@@ -82,7 +82,7 @@ pub trait DataReaction<T: PartialOrd> {
     }
 
     fn get_trend(values: &[ClimateData]) -> Trend {
-        let len = values.len();
+        let len = values.len().min(Self::PERIOD.as_secs() as usize / 5);
         if len < 2 {
             return Trend::None;
         }

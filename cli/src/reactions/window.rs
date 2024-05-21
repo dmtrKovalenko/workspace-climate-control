@@ -6,7 +6,6 @@ use crate::{
 use btleplug::api::{CharPropFlags, Peripheral};
 use chrono::Timelike;
 use std::{error::Error, time::Duration};
-use tokio::process::Command;
 use uuid::Uuid;
 
 const WINDOWS_CHARACTERISTIC_UUID: Uuid = Uuid::from_u128(0x19B10000_E8F2_537E_4F6C_D104768A1214);
@@ -53,7 +52,7 @@ impl WindowState {
 
 #[async_trait::async_trait]
 impl DataReaction<f32> for WindowState {
-    const PERIOD: Duration = Duration::from_secs(3600);
+    const PERIOD: Duration = Duration::from_secs(600);
     const TREND: Trend = Trend::Up;
 
     fn get_value(data: &ClimateData) -> f32 {
@@ -77,10 +76,10 @@ impl DataReaction<f32> for WindowState {
         tracing::info!("Window state: {:?}", data);
 
         if data.is_closed {
-            Command::new("shortcuts")
-                .args(["run", "Закрой шторы"])
-                .output()
-                .await?;
+            notify_rust::Notification::new()
+                .summary("Time to close the blinds")
+                .body("It's too bright")
+                .show()?;
         }
 
         Ok(())

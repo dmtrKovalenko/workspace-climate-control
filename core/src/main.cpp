@@ -1,16 +1,12 @@
-#include "Adafruit_BMP280.h" // include main library for BMP280 - Sensor
-#include "Adafruit_Si7021.h" // include main library for SI7021 - Sensor
+#include "Adafruit_BMP280.h"
+#include "Adafruit_Si7021.h"
 #include "HardwareSerial.h"
-#include "MHZ19.h"
+#include "ble.cpp"
 #include "ccs811.h"
 #include "i2c_scanner.h"
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <BH1750.h>
-#include <BLE2902.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
 #include <FirebaseJson.h>
 #include <Wire.h>
 
@@ -20,25 +16,11 @@ CCS811 ccs811;
 Adafruit_BMP280 bmp280; // I2C
 Adafruit_Si7021 SI702x = Adafruit_Si7021();
 BH1750 lightSensor(0x23);
-MHZ19 myMHZ19;
+MHZ19 mhZ19;
 
 HardwareSerial mySerial(2);
 
-BLECharacteristic *pCharacteristic;
-bool deviceConnected = false;
-
-class MyServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer *pServer) {
-    deviceConnected = true;
-    Serial.println("***** Connect");
-  }
-
-  void onDisconnect(BLEServer *pServer) {
-    Serial.println("***** Disconnect");
-    deviceConnected = false;
-    pServer->getAdvertising()->start();
-  }
-};
+BleProtocol bleProtocol;
 
 void setup() {
   Serial.begin(BAUDRATE);
@@ -88,112 +70,80 @@ void setup() {
   Serial.print(SI702x.sernum_a, HEX);
   Serial.println(SI702x.sernum_b, HEX);
 
-  // Wait for the sensors to stabilize delay(2000);
-
-  while (myMHZ19.errorCode != RESULT_OK) {
+  while (mhZ19.errorCode != RESULT_OK) {
     Serial.println("Estabilshing connection to MH-Z19");
-    myMHZ19.begin(mySerial);
+    mhZ19.begin(mySerial);
   };
 
-  myMHZ19.calibrate();
-
-  // Create the BLE Device
-  BLEDevice::init("CO2CICKA Sensor");
-
-  BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-  BLEService *pService =
-      pServer->createService(BLEUUID("0000FFE0-0000-1000-8000-00805F9B34FB"));
-
-  // Create a BLE Characteristic
-  pCharacteristic = pService->createCharacteristic(
-      BLEUUID("0000FFE1-0000-1000-8000-00805F9B34FB"),
-      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-
-  pCharacteristic->addDescriptor(new BLE2902());
-  pService->start();
-
-  // Start advertising
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(BLEUUID("0000FFE0-0000-1000-8000-00805F9B34FB"));
-  pAdvertising->start();
+  mhZ19.calibrate();
+  bleProtocol.setup(pSensors{&mhZ19});
 }
 
 int last_C02;
 unsigned long sync_timer = 0;
 
 void loop() {
-  if (millis() - sync_timer > 5000) {
-    int CO2 = myMHZ19.getCO2(false);
+  if (millis() - sync_timer > 2000) {
+    ErrorBitFlags errorFlags;
+    ClimateData data;
 
-    float lightIntensity = lightSensor.readLightLevel();
+    data.light = lightSensor.readLightLevel();
     Serial.print("Light Intensity: ");
-    Serial.print(lightIntensity);
+    Serial.print(data.light);
     Serial.println(" lux");
 
-    float temperature = bmp280.readTemperature() - 4;
+    data.temperature = bmp280.readTemperature() - 8;
     Serial.print("BMP280 => Temperature = ");
-    Serial.print(temperature);
+    Serial.print(data.temperature);
     Serial.print(" °C, ");
 
-    float pressure = bmp280.readPressure() / 100;
+    data.pressure = bmp280.readPressure() / 100;
     Serial.print("Pressure = ");
-    Serial.print(bmp280.readPressure() / 100);
+    Serial.print(data.pressure / 100);
     Serial.println(" Pa, ");
 
-    float humidity = SI702x.readHumidity() + 5;
+    data.humidity = SI702x.readHumidity() + 5;
     Serial.print("SI702x => Temperature = ");
     Serial.print(SI702x.readTemperature(), 2);
     Serial.print(" °C, ");
     Serial.print("Humidity = ");
-    Serial.println(humidity, 2);
+    Serial.println(data.humidity, 2);
 
-    uint16_t eco2, etvoc, errstat, raw; // Read CCS811
+    uint16_t errstat, raw; // Read CCS811
 
-    ccs811.set_envdata(temperature, humidity);
-    ccs811.read(&eco2, &etvoc, &errstat, &raw);
+    ccs811.set_envdata(data.temperature, data.humidity);
+    ccs811.read(&data.eco2, &data.etvoc, &errstat, &raw);
     if (errstat == CCS811_ERRSTAT_OK) {
       Serial.print("CCS811 => CO2 = ");
-      Serial.print(eco2);
+      Serial.print(data.eco2);
       Serial.print("ppm, TVOC = ");
-      Serial.println(etvoc);
+      Serial.println(data.etvoc);
+    } else {
+      errorFlags.ccs811 = errstat;
+      Serial.print("CCS811 Error: ");
+      Serial.println(errstat);
     }
 
-    FirebaseJson json;
-    if (myMHZ19.errorCode == RESULT_OK && CO2 > 0) {
+    int CO2 = mhZ19.getCO2();
+
+    if (mhZ19.errorCode == RESULT_OK && CO2 >= 400) {
       Serial.print("CO2 (ppm): ");
       Serial.println(CO2);
-      /*Serial.print("MHZ19 => Temperature (C): ");*/
-      /*Serial.println(Temp);*/
 
-      json.add("co2", CO2);
+      data.co2 = CO2;
       last_C02 = CO2;
+    } else if (mhZ19.errorCode == RESULT_OK && CO2 < 300) {
+      data.co2 = 400;
+      mhZ19.calibrate();
     } else {
-      json.add("co2", last_C02);
-      json.add("mhz19_error_code", myMHZ19.errorCode);
+      data.co2 = last_C02;
+      errorFlags.mhz19 = (ERRORCODE)mhZ19.errorCode;
 
       Serial.print("MH-Z19 Error: ");
-      Serial.println(myMHZ19.errorCode);
+      Serial.println(mhZ19.errorCode);
     }
 
-    if (lightIntensity > 0) {
-      json.add("light", lightIntensity);
-    }
-
-    if (temperature && pressure && humidity) {
-      json.add("temperature", temperature);
-      json.add("pressure", pressure);
-      json.add("humidity", humidity);
-    }
-
-    json.add("eco2", eco2);
-    json.add("etvoc", etvoc);
-
-    json.toString(Serial, true);
-
-    pCharacteristic->setValue(json.raw());
-    pCharacteristic->notify();
-
+    bleProtocol.notify(&data, &errorFlags);
     sync_timer = millis();
   }
 }

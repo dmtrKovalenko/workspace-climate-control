@@ -1,6 +1,6 @@
 use btleplug::api::{Central, CharPropFlags, Manager as _, Peripheral, ScanFilter};
 use btleplug::platform::Manager;
-use futures::stream::StreamExt;
+use futures::StreamExt;
 use std::error::Error;
 
 use std::time::Duration;
@@ -8,7 +8,6 @@ use tokio::time::{self, sleep, timeout};
 use uuid::Uuid;
 
 pub struct Connection<TPeripheral: Peripheral> {
-    _manager: Manager,
     peripheral: TPeripheral,
     characteristic: btleplug::api::Characteristic,
 }
@@ -114,6 +113,9 @@ pub async fn find_sensor(
         })
         .await?;
 
+    // start scanning for devices
+    adapter.start_scan(ScanFilter::default()).await?;
+
     time::sleep(Duration::from_secs(2)).await;
     let peripherals = adapter.peripherals().await?;
 
@@ -153,9 +155,9 @@ pub async fn find_sensor(
                         if characteristic.uuid == characteristic_uuid
                             && characteristic.properties.contains(property)
                         {
+                            adapter.stop_scan().await?;
                             tracing::debug!("Found characteristic {:?}", characteristic.uuid,);
                             return Ok(Connection {
-                                _manager: manager,
                                 peripheral,
                                 characteristic,
                             });

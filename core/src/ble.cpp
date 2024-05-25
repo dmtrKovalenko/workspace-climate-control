@@ -66,7 +66,8 @@ public:
     // Create a BLE Characteristic
     this->dataCharacteristic = pService->createCharacteristic(
         BLEUUID("0000FFE1-0000-1000-8000-00805F9B34FB"),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY |
+            BLECharacteristic::PROPERTY_INDICATE);
     this->dataCharacteristic->addDescriptor(new BLE2902());
 
     BLECharacteristic *pCharacteristic = pService->createCharacteristic(

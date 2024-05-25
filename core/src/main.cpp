@@ -110,23 +110,20 @@ void loop() {
     Serial.print("Humidity = ");
     Serial.println(data.humidity, 2);
 
-    uint16_t errstat, raw; // Read CCS811
-
+    uint16_t raw;
     ccs811.set_envdata(data.temperature, data.humidity);
-    ccs811.read(&data.eco2, &data.etvoc, &errstat, &raw);
-    if (errstat == CCS811_ERRSTAT_OK) {
+    ccs811.read(&data.eco2, &data.etvoc, &errorFlags.ccs811, &raw);
+    if (errorFlags.ccs811 == CCS811_ERRSTAT_OK) {
       Serial.print("CCS811 => CO2 = ");
       Serial.print(data.eco2);
       Serial.print("ppm, TVOC = ");
       Serial.println(data.etvoc);
     } else {
-      errorFlags.ccs811 = errstat;
       Serial.print("CCS811 Error: ");
-      Serial.println(errstat);
+      Serial.println(errorFlags.ccs811);
     }
 
     int CO2 = mhZ19.getCO2();
-
     if (mhZ19.errorCode == RESULT_OK && CO2 >= 400) {
       Serial.print("CO2 (ppm): ");
       Serial.println(CO2);

@@ -2,13 +2,18 @@ mod history;
 mod tui_app;
 use btleplug::api::CharPropFlags;
 use climate_data::ClimateData;
+use crossterm::{
+    terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use futures::FutureExt;
 use history::History;
 use spinners::{Spinner, Spinners};
 use tui_app::TerminalUi;
 use uuid::Uuid;
 mod bluetooth;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, io::stdout, os::unix::process};
 
 mod climate_data;
 mod reactions;
@@ -24,7 +29,7 @@ fn set_terminal_tab_title(climate_data: impl AsRef<str> + Display) {
     }
 }
 
-#[tokio::main]
+#[tokio::main()]
 async fn main() -> Result<(), Box<dyn Error>> {
     let file_appender = tracing_appender::rolling::hourly("/tmp/co2cicka", "cli.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -35,15 +40,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .pretty()
         .init();
 
-    let stdout = std::io::stdout();
-    let backend = CrosstermBackend::new(stdout);
+    let backend = CrosstermBackend::new(stdout());
     let mut history = History::new();
-    let mut app = TerminalUi::new()?;
     let mut terminal = Terminal::new(backend)?;
+    let mut app = TerminalUi::new()?;
 
     loop {
         let mut spinner_stopped = false;
-        let mut spinner = Spinner::new(Spinners::Dots9, "Connecting to sensor".to_owned());
+        let mut spinner = Spinner::new(Spinners::Pong, "Connecting to sensor".to_owned());
         tracing::debug!("Looking for a sensor...");
         set_terminal_tab_title("Connecting to a sensor...");
 
@@ -54,6 +58,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .await
         {
+            stdout().execute(EnterAlternateScreen)?;
+            crossterm::terminal::enable_raw_mode()?;
+            // Exit of the app can happen only from the event poller:
+            app.start_event_polling();
+
             let result = connection
                 .subscribe_to_sensor(|data: ClimateData| {
                     tracing::debug!("New climate data: {:?}", data);
@@ -89,6 +98,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
 
             connection.disconnect_with_timeout().await;
+            stdout().execute(LeaveAlternateScreen)?;
+            disable_raw_mode()?;
         }
 
         terminal.clear()?;

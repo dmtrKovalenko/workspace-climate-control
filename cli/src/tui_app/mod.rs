@@ -1,6 +1,7 @@
 mod chart;
 
 use crate::{climate_data::ClimateData, history::History};
+use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -11,9 +12,12 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use std::error::Error;
-
 use self::chart::{render_chart, ChartOptions};
+use std::{
+    error::Error,
+    sync::{Arc, RwLock},
+};
+
 pub enum UiState {
     Spinner(String),
     Connected,
@@ -21,19 +25,43 @@ pub enum UiState {
 
 pub struct TerminalUi {
     last_climate_data: Option<ClimateData>,
-    state: UiState,
+    state: Arc<RwLock<UiState>>,
 }
 
 impl TerminalUi {
+    pub fn start_event_polling(&self) -> tokio::task::JoinHandle<std::io::Result<()>> {
+        tokio::task::spawn_blocking(|| -> std::io::Result<()> {
+            loop {
+                if crossterm::event::poll(std::time::Duration::from_millis(16))? {
+                    if let Event::Key(key) = event::read()? {
+                        match key.code {
+                            KeyCode::Char('c')
+                                if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
+                            {
+                                // a bit of ugly way to exit but we do not deal with any
+                                // graceful resource cleanup as system will do that for us
+                                // and we can encapsulate this thread in the terminal ui
+                                std::process::exit(0);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        })
+    }
+
     pub fn new() -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             last_climate_data: None,
-            state: UiState::Spinner("Connecting to sensor...".to_string()),
+            state: Arc::new(RwLock::new(UiState::Spinner(
+                "Connecting to sensor...".to_string(),
+            ))),
         })
     }
 
     pub fn capture_measurements(&mut self, climate_data: &ClimateData) {
-        self.state = UiState::Connected;
+        *self.state.write().unwrap() = UiState::Connected;
         self.last_climate_data = Some(*climate_data);
     }
 
@@ -43,8 +71,8 @@ impl TerminalUi {
             .direction(Direction::Vertical)
             .spacing(1)
             .constraints([
-                Constraint::Percentage(25),
-                Constraint::Percentage(35),
+                Constraint::Length(9),
+                Constraint::Max(400),
                 Constraint::Percentage(40),
             ])
             .split(size);
@@ -149,8 +177,8 @@ impl TerminalUi {
 
         terminal
             .draw(|f| {
-                match &self.state {
-                    UiState::Spinner(title) => self.render_placeholder(title.as_str(), f),
+                match *self.state.read().unwrap() {
+                    UiState::Spinner(ref title) => self.render_placeholder(title.as_str(), f),
                     UiState::Connected => {
                         self.render_dashboard(history, f);
                     }
@@ -207,8 +235,8 @@ impl TerminalUi {
                 Span::from("Pressure: "),
                 Span::styled(
                     format!(
-                        "{} mm of mercury ({:.2} hPa)",
-                        last_climate_data.pressure * 0.7500637554192107,
+                        "{:.2}mm Hg ({:.2} hPa)",
+                        last_climate_data.pressure * 0.750_063_8,
                         last_climate_data.pressure,
                     ),
                     Style::default()

@@ -23,3 +23,7 @@ ratatui = "0.26.3"
 uuid = "1.3.2"
 regex = "1.10.4"
 btleplug = {  package = "btleplug-goose-fixed",  version = "0.11.5" }
+
+[build-dependencies]
+cc = "1.0"
+bindgen = "0.69.4"

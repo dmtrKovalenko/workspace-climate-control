@@ -1,9 +1,10 @@
-#include "BLECharacteristic.h"
-#include "serialize.h"
+#include "../../shared/conf.h"
 #include <BLE2902.h>
+#include <BLECharacteristic.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
+#include <serialize.h>
 
 struct BleState {
   bool hasBleConnection = false;
@@ -36,7 +37,7 @@ public:
   void onWrite(BLECharacteristic *pCharacteristic) {
     std::string value = pCharacteristic->getValue();
 
-    if (value == "CalibrateMhZ19") {
+    if (value == BLE_MAIN_SENSOR_CALIBRATE_CO2) {
       this->sensors->mhz19->calibrate();
     }
   }
@@ -55,23 +56,23 @@ public:
   void setup(pSensors sensors) {
     this->sensors = sensors;
     // Create the BLE Device
-    BLEDevice::init("CO2CICKA Sensor");
+    BLEDevice::init(BLE_MAIN_SERVICE_LOCAL_NAME);
 
     this->pServer = BLEDevice::createServer();
 
     pServer->setCallbacks(new BleServerCallbacks(&bleState));
     BLEService *pService =
-        pServer->createService(BLEUUID("0000FFE0-0000-1000-8000-00805F9B34FB"));
+        pServer->createService(BLEUUID(BLE_MAIN_SENSOR_SERVICE));
 
     // Create a BLE Characteristic
     this->dataCharacteristic = pService->createCharacteristic(
-        BLEUUID("0000FFE1-0000-1000-8000-00805F9B34FB"),
+        BLEUUID(BLE_MAIN_SENSOR_STREAM_CHAR),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY |
             BLECharacteristic::PROPERTY_INDICATE);
     this->dataCharacteristic->addDescriptor(new BLE2902());
 
     BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-        BLEUUID("beb5483e-36e1-4688-b7f5-ea07361b26a8"),
+        BLEUUID(BLE_MAIN_SENSOR_ACTION_CHAR),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
 
     pCharacteristic->setCallbacks(new BleActionCallbacks(&sensors));
@@ -80,8 +81,7 @@ public:
 
     // Start advertising
     BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-    pAdvertising->addServiceUUID(
-        BLEUUID("0000FFE0-0000-1000-8000-00805F9B34FB"));
+    pAdvertising->addServiceUUID(BLEUUID(BLE_MAIN_SENSOR_SERVICE));
     pAdvertising->start();
   };
 

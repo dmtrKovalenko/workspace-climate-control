@@ -1,24 +1,22 @@
+mod config;
 mod history;
 mod tui_app;
-use btleplug::api::CharPropFlags;
 use climate_data::ClimateData;
 use crossterm::{
     terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use futures::FutureExt;
 use history::History;
 use spinners::{Spinner, Spinners};
 use tui_app::TerminalUi;
 use uuid::Uuid;
 mod bluetooth;
+use config::*;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{error::Error, fmt::Display, io::stdout, os::unix::process};
+use std::{error::Error, fmt::Display, io::stdout, str::FromStr};
 
 mod climate_data;
 mod reactions;
-
-const CORE_CHARACTERISTIC_UUID: Uuid = Uuid::from_u128(0x0000FFE1_0000_1000_8000_00805F9B34FB);
 
 fn set_terminal_tab_title(climate_data: impl AsRef<str> + Display) {
     use std::io::Write;
@@ -31,7 +29,7 @@ fn set_terminal_tab_title(climate_data: impl AsRef<str> + Display) {
 
 #[tokio::main()]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let file_appender = tracing_appender::rolling::hourly("/tmp/co2cicka", "cli.log");
+    let file_appender = tracing_appender::rolling::hourly("/tmp/co2nsole", "cli.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::fmt()
@@ -51,10 +49,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tracing::debug!("Looking for a sensor...");
         set_terminal_tab_title("Connecting to a sensor...");
 
-        if let Ok(connection) = bluetooth::find_sensor(
-            "CO2CICKA Sensor",
-            CORE_CHARACTERISTIC_UUID,
-            CharPropFlags::NOTIFY,
+        if let Ok(mut connection) = bluetooth::connect_to(
+            &BLE_MAIN_SERVICE_LOCAL_NAME,
+            Uuid::from_str(&BLE_MAIN_SENSOR_SERVICE)?,
         )
         .await
         {
@@ -64,30 +61,33 @@ async fn main() -> Result<(), Box<dyn Error>> {
             app.start_event_polling();
 
             let result = connection
-                .subscribe_to_sensor(|data: ClimateData| {
-                    tracing::debug!("New climate data: {:?}", data);
-                    if !spinner_stopped {
-                        spinner.stop();
-                        terminal.clear().unwrap();
-                        spinner_stopped = true
-                    }
+                .subscribe(
+                    Uuid::from_str(&BLE_MAIN_SENSOR_STREAM_CHAR)?,
+                    |data: ClimateData| {
+                        tracing::debug!("New climate data: {:?}", data);
+                        if !spinner_stopped {
+                            spinner.stop();
+                            terminal.clear().unwrap();
+                            spinner_stopped = true
+                        }
 
-                    set_terminal_tab_title(format!(
-                        "T {}°C; CO2 {} ppm; H {}%",
-                        data.temperature,
-                        data.co2.unwrap_or(400),
-                        data.humidity.round()
-                    ));
+                        set_terminal_tab_title(format!(
+                            "T {}°C; CO2 {} ppm; H {}%",
+                            data.temperature,
+                            data.co2.unwrap_or(400),
+                            data.humidity.round()
+                        ));
 
-                    history.capture_measurement(&data);
+                        history.capture_measurement(&data);
 
-                    app.capture_measurements(&data);
-                    app.draw(&history, &mut terminal);
+                        app.capture_measurements(&data);
+                        app.draw(&history, &mut terminal);
 
-                    if cfg!(debug_assertions) {
-                        reactions::run_reactions(history.flat.as_slice());
-                    }
-                })
+                        if cfg!(debug_assertions) {
+                            reactions::run_reactions(history.flat.as_slice());
+                        }
+                    },
+                )
                 .await;
 
             match result {

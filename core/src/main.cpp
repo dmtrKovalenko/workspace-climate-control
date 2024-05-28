@@ -76,7 +76,6 @@ void setup() {
   };
 
   delay(2000);
-  mhZ19.calibrate();
   bleProtocol.setup(pSensors{&mhZ19});
 }
 

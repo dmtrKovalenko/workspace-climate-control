@@ -1,3 +1,4 @@
+#include "../../shared/conf.h"
 #include "Adafruit_TinyUSB.h"
 #include "Adafruit_VL53L0X.h"
 #include "battery.h"
@@ -8,14 +9,14 @@
 SoftwareTimer mainTimer;
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
-BLEService service("19B10000-E8F2-537E-4F6C-D104768A1214");
-BLECharacteristic characteristic("19B10000-E8F2-537E-4F6C-D104768A1214");
+BLEService service(BLE_WINDOW_SENSOR_SERVICE);
+BLECharacteristic characteristic(BLE_WINDOW_SENSOR_SERVICE);
 
 BLEDis bledis; // DIS (Device Information Service) helper class instance
 Battery battery;
 
 void prepareBluetooth() {
-  Bluefruit.setName("CO2CICKA WINDOWS");
+  Bluefruit.setName(BLE_WINDOW_SERVICE_LOCAL_NAME);
 
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();

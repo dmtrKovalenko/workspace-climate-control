@@ -98,4 +98,3 @@ pub fn render_chart<'a, TMeasure: Display>(
 
     frame.render_widget(chart, area);
 }
-

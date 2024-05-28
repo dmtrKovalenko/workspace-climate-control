@@ -115,7 +115,7 @@ impl TerminalUi {
             .split(main_layout[0]);
 
         self.render_overview(&latest_climate_data, f, top_layout[1]);
-        if let Some(advice_layout) = top_layout.get(0) {
+        if let Some(advice_layout) = top_layout.first() {
             render_dumb_advice_block(&latest_climate_data, advice_layout, f)
         }
 

@@ -182,8 +182,7 @@ pub async fn connect_to(
                     if peripheral
                         .services()
                         .iter()
-                        .find(|service| service.uuid == service_uuid)
-                        .is_some()
+                        .any(|service| service.uuid == service_uuid)
                     {
                         return Ok(Connection {
                             peripheral,

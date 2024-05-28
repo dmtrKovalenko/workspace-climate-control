@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+
+jobs:
+  cli-precheck:
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIRECTORY: ./subdirectory_path
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            cli/
+            shared/
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: beta
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./cli -> target
+          prefix-key: "v0-check-rust"
+          cache-on-failure: true
+
+      - name: Check formatting
+        working-directory: cli
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        working-directory: cli
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  cli-build:
+    needs: [cli-precheck]
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        rust: [stable, nightly]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            cli/
+            shared/
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./cli -> target
+          prefix-key: "v0-build-${{ matrix.rust }}-rust"
+          cache-on-failure: true
+
+      - name: Build
+        working-directory: cli
+        run: cargo build --verbose
+
+  iot-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Build Core Sensor
+        working-directory: core
+        run: pio run

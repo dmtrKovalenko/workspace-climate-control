@@ -10,4 +10,3 @@ fn main() {
         .write_to_file("src/config/raw_bindings.rs")
         .expect("Couldn't write bindings!");
 }
-

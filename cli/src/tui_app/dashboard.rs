@@ -1,5 +1,5 @@
 use super::{
-  buttons::render_buttons,
+    buttons::render_buttons,
     chart::{render_chart, ChartOptions},
     dumb_advice::render_dumb_advice_block,
 };
@@ -243,4 +243,3 @@ impl DashboardView {
         }
     }
 }
-

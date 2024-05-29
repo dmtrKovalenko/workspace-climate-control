@@ -4,7 +4,7 @@ mod history;
 mod tui_app;
 use climate_data::ClimateData;
 use crossterm::{
-    terminal::{self, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use history::History;

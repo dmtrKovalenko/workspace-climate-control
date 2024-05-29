@@ -127,15 +127,11 @@ impl DashboardView {
         let main_layout = Layout::default()
             .direction(Direction::Vertical)
             .spacing(1)
-            .constraints(match size.height {
-                //0..=20 => vec![Constraint::Length(10)],
-                //21..=60 => vec![Constraint::Length(10), Constraint::Fill(1)],
-                _ => vec![
-                    Constraint::Length(10),
-                    Constraint::Max(70),
-                    Constraint::Percentage(40),
-                ],
-            })
+            .constraints(vec![
+                Constraint::Length(10),
+                Constraint::Max(70),
+                Constraint::Percentage(40),
+            ])
             .split(size);
 
         let top_layout = Layout::default()
@@ -163,7 +159,7 @@ impl DashboardView {
 
         if let Some(co2_layout) = main_layout.get(1) {
             render_chart(
-                &history,
+                history,
                 f,
                 ChartOptions {
                     unit_of_measurement: "ppm",
@@ -177,12 +173,12 @@ impl DashboardView {
                             .name("eCO2 ppm")
                             .marker(symbols::Marker::Braille)
                             .style(Style::default().fg(Color::Gray))
-                            .data(&history.eco2_history.as_slice()),
+                            .data(history.eco2_history.as_slice()),
                         Dataset::default()
                             .name("CO2 ppm")
                             .marker(symbols::Marker::Braille)
                             .style(Style::default().fg(Color::Cyan))
-                            .data(&history.co2_history.as_slice()),
+                            .data(history.co2_history.as_slice()),
                     ],
                 },
             );
@@ -200,7 +196,7 @@ impl DashboardView {
                 .split(*horizontal_layout);
 
             render_chart(
-                &history,
+                history,
                 f,
                 ChartOptions {
                     unit_of_measurement: "°C",
@@ -217,13 +213,13 @@ impl DashboardView {
                         .name("°C")
                         .marker(symbols::Marker::Braille)
                         .style(Style::default().fg(Color::LightRed))
-                        .data(&history.temperature_history.as_slice())],
+                        .data(history.temperature_history.as_slice())],
                 },
             );
 
             if let Some(pressure_layout) = horizontal_charts_layout.get(1) {
                 render_chart(
-                    &history,
+                    history,
                     f,
                     ChartOptions {
                         unit_of_measurement: "hPa",
@@ -240,7 +236,7 @@ impl DashboardView {
                             .name("hectoPascals")
                             .marker(symbols::Marker::Bar)
                             .style(Style::default().fg(Color::Blue))
-                            .data(&history.pressure_history.as_slice())],
+                            .data(history.pressure_history.as_slice())],
                     },
                 );
             }

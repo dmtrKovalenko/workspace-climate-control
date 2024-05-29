@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use std::ops::{Add, Range};
 use crate::climate_data::ClimateData;
+use std::ops::{Add, Range};
 
 pub struct MaxSizedVector<T, const MAX_SIZE: usize> {
     data: Vec<T>,
@@ -60,6 +60,7 @@ type HistoryPoint = (f64, f64);
 
 pub struct History {
     time_window: [f64; 2],
+    pub latest_climate_data: Option<ClimateData>,
     pub flat: MaxSizedVector<ClimateData, HISTORY_SIZE>,
     pub co2_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
     pub eco2_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
@@ -103,6 +104,7 @@ impl History {
     pub fn new() -> Self {
         let now = chrono::offset::Local::now().timestamp_millis() as f64;
         Self {
+            latest_climate_data: None,
             time_window: [now, now],
             flat: MaxSizedVector::new(),
             co2_history: MaxSizedVector::new(),
@@ -116,6 +118,7 @@ impl History {
     pub fn capture_measurement(&mut self, climate_data: &ClimateData) {
         let now = chrono::offset::Local::now().timestamp_millis() as f64;
         self.time_window[1] = now;
+        self.latest_climate_data = Some(*climate_data);
 
         self.flat.push(*climate_data);
         self.temperature_history

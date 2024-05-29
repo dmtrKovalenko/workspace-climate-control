@@ -4,7 +4,7 @@ mod history;
 mod tui_app;
 use climate_data::ClimateData;
 use crossterm::{
-    terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{self, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use history::History;
@@ -19,7 +19,7 @@ use std::{
     fmt::Display,
     io::stdout,
     str::FromStr,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use crate::ble_actions::run_ble_mpsc;
@@ -49,8 +49,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let backend = CrosstermBackend::new(stdout());
     let history = Arc::new(RwLock::new(History::new()));
-    let mut terminal = Terminal::new(backend)?;
-    let mut app = TerminalUi::new(Arc::clone(&history))?;
+    let terminal = Arc::new(Mutex::new(Terminal::new(backend)?));
+    let app = Arc::new(TerminalUi::new(Arc::clone(&history))?);
 
     loop {
         let mut spinner_stopped = false;
@@ -69,12 +69,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let (tx, rx) = tokio::sync::mpsc::channel(100);
 
             // Exit of the app can happen only from the event poller:
-            TerminalUi::start_event_polling(app.state.clone(), tx);
+            TerminalUi::start_event_polling(Arc::clone(&app), tx, terminal.clone());
 
             let ble_action_handler = run_ble_mpsc(&connection, rx);
             let ble_subscription = connection.subscribe(
                 Uuid::from_str(&BLE_MAIN_SENSOR_STREAM_CHAR)?,
                 |data: ClimateData| {
+                    let terminal = &mut terminal.lock().unwrap();
                     tracing::debug!("New climate data: {:?}", data);
                     if !spinner_stopped {
                         spinner.stop();
@@ -93,8 +94,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         history.write().unwrap().capture_measurement(&data);
                     }
 
-                    app.capture_measurements(&data);
-                    app.draw(&mut terminal);
+                    app.draw(terminal);
 
                     if cfg!(debug_assertions) {
                         reactions::run_reactions(history.read().unwrap().flat.as_slice());
@@ -114,6 +114,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             disable_raw_mode()?;
         }
 
-        terminal.clear()?;
+        terminal.lock().unwrap().clear()?;
     }
 }

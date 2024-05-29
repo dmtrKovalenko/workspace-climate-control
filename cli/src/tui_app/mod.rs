@@ -6,7 +6,7 @@ mod dumb_advice;
 use crate::{ble_actions::BleAction, climate_data::ClimateData, history::History};
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
-    backend::Backend,
+    backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     symbols,
@@ -24,8 +24,9 @@ use self::{
 };
 use std::{
     error::Error,
+    io::Stdout,
     ops::Deref,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 pub enum View {
@@ -45,16 +46,17 @@ pub enum Action {
 }
 
 pub struct TerminalUi {
-    last_climate_data: Option<ClimateData>,
     pub state: Arc<RwLock<View>>,
     history: Arc<RwLock<History>>,
 }
 
 impl TerminalUi {
     pub fn start_event_polling(
-        state_ref: Arc<RwLock<View>>,
+        self: Arc<Self>,
         ble_sender: Sender<BleAction>,
+        terminal: Arc<Mutex<Terminal<CrosstermBackend<Stdout>>>>,
     ) -> tokio::task::JoinHandle<std::io::Result<()>> {
+        let me = Arc::clone(&self);
         tokio::task::spawn(async move {
             loop {
                 if crossterm::event::poll(std::time::Duration::from_millis(16))? {
@@ -70,7 +72,7 @@ impl TerminalUi {
                             }
                             keycode => {
                                 let action = {
-                                    let state_read = state_ref.read().unwrap();
+                                    let state_read = &me.state.read().unwrap();
 
                                     match state_read.deref() {
                                         View::Dashboard => handle_dashboard_key_event(keycode),
@@ -80,11 +82,11 @@ impl TerminalUi {
 
                                 match action {
                                     Some(Action::OpenCalibrateTemperaturePopup) => {
-                                        *state_ref.write().unwrap() =
+                                        *me.state.write().unwrap() =
                                             View::Calibrate(CalibrationPopup::temperature());
                                     }
                                     Some(Action::OpenCalibrateCo2Popup) => {
-                                        *state_ref.write().unwrap() =
+                                        *me.state.write().unwrap() =
                                             View::Calibrate(CalibrationPopup::co2());
                                     }
                                     Some(Action::CalibrateCo2) => {
@@ -97,7 +99,7 @@ impl TerminalUi {
                                             );
                                         }
 
-                                        *state_ref.write().unwrap() = View::Dashboard
+                                        *me.state.write().unwrap() = View::Dashboard
                                     }
                                     Some(Action::Reconnect) => {
                                         ble_sender.send(BleAction::Stop).await.unwrap();
@@ -109,12 +111,14 @@ impl TerminalUi {
                                         std::process::exit(0);
                                     }
                                     Some(Action::OpenDashboard) => {
-                                        *state_ref.write().unwrap() = View::Dashboard
+                                        *me.state.write().unwrap() = View::Dashboard
                                     }
                                     None => {}
                                 }
                             }
                         }
+
+                        me.draw(&mut terminal.lock().unwrap());
                     }
                 }
             }
@@ -124,20 +128,15 @@ impl TerminalUi {
     pub fn new(history: Arc<RwLock<History>>) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             history,
-            last_climate_data: None,
             state: Arc::new(RwLock::new(View::Dashboard)),
         })
-    }
-
-    pub fn capture_measurements(&mut self, climate_data: &ClimateData) {
-        self.last_climate_data = Some(*climate_data);
     }
 
     fn render_dashboard(&self, f: &mut Frame) {
         let size = f.size();
         let history = self.history.read().unwrap();
 
-        let latest_climate_data = if let Some(latest_climate_data) = self.last_climate_data {
+        let latest_climate_data = if let Some(latest_climate_data) = history.latest_climate_data {
             latest_climate_data
         } else {
             return;

@@ -1,7 +1,8 @@
 [package]
-name = "cli"
+name = "co2nsole"
 version = "0.1.0"
 edition = "2021"
+description = "CLI for the co2nsole project"
 
 [dependencies]
 async-trait = "0.1.68"

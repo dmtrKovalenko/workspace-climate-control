@@ -65,8 +65,9 @@ pub struct History {
     pub co2_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
     pub eco2_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
     pub temperature_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
-    pub temperature_minmax: Option<Range<f32>>,
+    pub temperature_minmax: Option<Range<f64>>,
     pub pressure_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
+    pub pressure_minmax: Option<Range<f64>>,
 }
 
 impl History {
@@ -112,6 +113,7 @@ impl History {
             temperature_history: MaxSizedVector::new(),
             temperature_minmax: None,
             pressure_history: MaxSizedVector::new(),
+            pressure_minmax: None,
         }
     }
 
@@ -124,7 +126,7 @@ impl History {
         self.temperature_history
             .push((now, climate_data.temperature as f64));
         self.temperature_minmax = Some(Self::update_min_max_range(
-            climate_data.temperature,
+            climate_data.temperature as f64,
             &self.temperature_minmax,
         ));
 
@@ -135,5 +137,9 @@ impl History {
         self.eco2_history.push((now, climate_data.eco2 as f64));
         self.pressure_history
             .push((now, climate_data.pressure as f64));
+        self.pressure_minmax = Some(Self::update_min_max_range(
+            climate_data.pressure as f64,
+            &self.pressure_minmax,
+        ));
     }
 }

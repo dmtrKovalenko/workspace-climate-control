@@ -1,9 +1,9 @@
 use super::Action;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
-    style::{Color, Style},
-    text::Line,
+    layout::{Alignment, Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
@@ -19,8 +19,24 @@ enum Tab {
 }
 
 impl Tab {
+    fn get_char(&self) -> char {
+        match self {
+            Tab::Co2 => 'c',
+            Tab::Temperature { .. } => 't',
+        }
+    }
+
     fn title(self) -> Line<'static> {
-        Line::styled(format!(" {self} "), Style::default().fg(Color::White))
+        Line::from(vec![
+            Span::from(" "),
+            Span::styled(
+                format!("[{}]", self.get_char()),
+                Style::default().fg(Color::Blue),
+            ),
+            Span::from(" "),
+            Span::styled(format!("{self}"), Style::default().fg(Color::White)),
+            Span::from(" "),
+        ])
     }
 }
 
@@ -61,8 +77,7 @@ impl CalibrationPopup {
     fn render_co2_tab(&self, area: Rect, f: &mut Frame) {
         let text = Paragraph::new(vec![
           Line::from(""),
-          Line::from("Calibration of CO2 is performed by a controlled measurement which will be used as a 400ppm point. For better results put sensor outside or in a well ventilated room."),
-          Line::from("Press <Enter> to send calibration request"),
+          Line::from("Calibration of CO2 is performed by a controlled measurement which will be used as a 400ppm point. For better results put the sensor outside or in a well ventilated room."),
         ]).wrap(Wrap { trim: true });
 
         f.render_widget(text, area);
@@ -74,7 +89,6 @@ impl CalibrationPopup {
             Line::from(
                 "To calibrate temperature please enter the desired temperature in Celsius. It will be used as an ideal temperature point and all the values will be scaled accordingly.",
             ),
-            Line::from("Press <Enter> to send calibration request"),
         ]).wrap(Wrap { trim: true });
 
         f.render_widget(text, area);
@@ -95,12 +109,35 @@ impl CalibrationPopup {
         };
 
         let tabs = ratatui::widgets::Tabs::new(titles)
-            .highlight_style(Style::default().bg(Color::Black))
+            .highlight_style(
+                Style::default()
+                    .bg(Color::Black)
+                    .add_modifier(Modifier::BOLD),
+            )
             .select(selected_tab_index)
             .padding("", "")
             .divider(" ");
 
         f.render_widget(tabs, area)
+    }
+
+    fn render_control(&self, area: Rect, f: &mut Frame) {
+        let area = centered_rect(40, 100, area);
+        let text = Paragraph::new(vec![Line::from(" Press [Enter] to calibrate ")])
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .style(
+                        Style::default()
+                            .fg(Color::Blue)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .borders(Borders::ALL)
+                    .border_type(ratatui::widgets::BorderType::Rounded),
+            )
+            .wrap(Wrap { trim: true });
+
+        f.render_widget(text, area);
     }
 
     pub fn render(&self, f: &mut Frame) {
@@ -114,9 +151,14 @@ impl CalibrationPopup {
         f.render_widget(Clear, area);
         f.render_widget(popup_block, area);
 
-        let [tabs_area, body_area] =
-            Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
+        let [tabs_area, body_area, control_area] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Min(0),
+            Constraint::Length(3),
+        ])
+        .areas(area);
         self.render_tabs(tabs_area, f);
+        self.render_control(control_area, f);
 
         let [_, body_area, _] = Layout::horizontal([
             Constraint::Length(1),

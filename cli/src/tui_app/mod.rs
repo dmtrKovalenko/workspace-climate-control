@@ -1,8 +1,9 @@
 mod buttons;
+mod calibration_popup;
 mod chart;
 mod dumb_advice;
 
-use crate::{climate_data::ClimateData, history::History};
+use crate::{ble_actions::BleAction, climate_data::ClimateData, history::History};
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
     backend::Backend,
@@ -13,30 +14,48 @@ use ratatui::{
     widgets::{Block, Borders, Dataset, Paragraph, Wrap},
     Frame, Terminal,
 };
+use tokio::sync::mpsc::Sender;
 
 use self::{
-    buttons::{match_button, render_buttons},
+    buttons::{handle_dashboard_key_event, render_buttons},
+    calibration_popup::CalibrationPopup,
     chart::{render_chart, ChartOptions},
     dumb_advice::render_dumb_advice_block,
 };
 use std::{
     error::Error,
+    ops::Deref,
     sync::{Arc, RwLock},
 };
 
-pub enum UiState {
-    Spinner(String),
-    Connected,
+pub enum View {
+    Dashboard,
+    Calibrate(CalibrationPopup),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Action {
+    Reconnect,
+    Exit,
+    ClearHistory,
+    OpenDashboard,
+    OpenCalibrateCo2Popup,
+    OpenCalibrateTemperaturePopup,
+    CalibrateCo2,
 }
 
 pub struct TerminalUi {
     last_climate_data: Option<ClimateData>,
-    state: Arc<RwLock<UiState>>,
+    pub state: Arc<RwLock<View>>,
+    history: Arc<RwLock<History>>,
 }
 
 impl TerminalUi {
-    pub fn start_event_polling(&self) -> tokio::task::JoinHandle<std::io::Result<()>> {
-        tokio::task::spawn_blocking(|| -> std::io::Result<()> {
+    pub fn start_event_polling(
+        state_ref: Arc<RwLock<View>>,
+        ble_sender: Sender<BleAction>,
+    ) -> tokio::task::JoinHandle<std::io::Result<()>> {
+        tokio::task::spawn(async move {
             loop {
                 if crossterm::event::poll(std::time::Duration::from_millis(16))? {
                     if let Event::Key(key) = event::read()? {
@@ -49,14 +68,52 @@ impl TerminalUi {
                                 // and we can encapsulate this thread in the terminal ui
                                 std::process::exit(0);
                             }
-                            KeyCode::Char(char) => {
-                                let action = match_button(char);
+                            keycode => {
+                                let action = {
+                                    let state_read = state_ref.read().unwrap();
 
-                                if let Some(action) = action {
-                                    todo!("Handle the button {:?} action", action);
+                                    match state_read.deref() {
+                                        View::Dashboard => handle_dashboard_key_event(keycode),
+                                        View::Calibrate(ref popup) => popup.handle_key(key),
+                                    }
+                                };
+
+                                match action {
+                                    Some(Action::OpenCalibrateTemperaturePopup) => {
+                                        *state_ref.write().unwrap() =
+                                            View::Calibrate(CalibrationPopup::temperature());
+                                    }
+                                    Some(Action::OpenCalibrateCo2Popup) => {
+                                        *state_ref.write().unwrap() =
+                                            View::Calibrate(CalibrationPopup::co2());
+                                    }
+                                    Some(Action::CalibrateCo2) => {
+                                        if let Err(err) =
+                                            ble_sender.send(BleAction::CalibrateCo2).await
+                                        {
+                                            tracing::error!(
+                                                "Failed to send CO2 calibration request: {:?}",
+                                                err
+                                            );
+                                        }
+
+                                        *state_ref.write().unwrap() = View::Dashboard
+                                    }
+                                    Some(Action::Reconnect) => {
+                                        ble_sender.send(BleAction::Stop).await.unwrap();
+                                    }
+                                    Some(Action::ClearHistory) => {
+                                        todo!()
+                                    }
+                                    Some(Action::Exit) => {
+                                        std::process::exit(0);
+                                    }
+                                    Some(Action::OpenDashboard) => {
+                                        *state_ref.write().unwrap() = View::Dashboard
+                                    }
+                                    None => {}
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -64,22 +121,22 @@ impl TerminalUi {
         })
     }
 
-    pub fn new() -> Result<Self, Box<dyn Error>> {
+    pub fn new(history: Arc<RwLock<History>>) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
+            history,
             last_climate_data: None,
-            state: Arc::new(RwLock::new(UiState::Spinner(
-                "Connecting to sensor...".to_string(),
-            ))),
+            state: Arc::new(RwLock::new(View::Dashboard)),
         })
     }
 
     pub fn capture_measurements(&mut self, climate_data: &ClimateData) {
-        *self.state.write().unwrap() = UiState::Connected;
         self.last_climate_data = Some(*climate_data);
     }
 
-    fn render_dashboard(&self, history: &History, f: &mut Frame) {
+    fn render_dashboard(&self, f: &mut Frame) {
         let size = f.size();
+        let history = self.history.read().unwrap();
+
         let latest_climate_data = if let Some(latest_climate_data) = self.last_climate_data {
             latest_climate_data
         } else {
@@ -125,7 +182,7 @@ impl TerminalUi {
 
         if let Some(co2_layout) = main_layout.get(1) {
             render_chart(
-                history,
+                &history,
                 f,
                 ChartOptions {
                     unit_of_measurement: "ppm",
@@ -139,12 +196,12 @@ impl TerminalUi {
                             .name("eCO2 ppm")
                             .marker(symbols::Marker::Braille)
                             .style(Style::default().fg(Color::Gray))
-                            .data(history.eco2_history.as_slice()),
+                            .data(&history.eco2_history.as_slice()),
                         Dataset::default()
                             .name("CO2 ppm")
                             .marker(symbols::Marker::Braille)
                             .style(Style::default().fg(Color::Cyan))
-                            .data(history.co2_history.as_slice()),
+                            .data(&history.co2_history.as_slice()),
                     ],
                 },
             );
@@ -162,7 +219,7 @@ impl TerminalUi {
                 .split(*horizontal_layout);
 
             render_chart(
-                history,
+                &history,
                 f,
                 ChartOptions {
                     unit_of_measurement: "°C",
@@ -175,13 +232,13 @@ impl TerminalUi {
                         .name("°C")
                         .marker(symbols::Marker::Braille)
                         .style(Style::default().fg(Color::LightRed))
-                        .data(history.temperature_history.as_slice())],
+                        .data(&history.temperature_history.as_slice())],
                 },
             );
 
             if let Some(pressure_layout) = horizontal_charts_layout.get(1) {
                 render_chart(
-                    history,
+                    &history,
                     f,
                     ChartOptions {
                         unit_of_measurement: "hPa",
@@ -194,29 +251,14 @@ impl TerminalUi {
                             .name("hectoPascals")
                             .marker(symbols::Marker::Bar)
                             .style(Style::default().fg(Color::Blue))
-                            .data(history.pressure_history.as_slice())],
+                            .data(&history.pressure_history.as_slice())],
                     },
                 );
             }
         }
     }
 
-    fn render_placeholder(&self, title: &str, f: &mut Frame) {
-        let text = vec![Line::from(Span::styled(
-            "Please wait for the sensor to connect..",
-            Style::default().fg(Color::Red),
-        ))];
-
-        let block = Paragraph::new(text)
-            .block(Block::default().title(title).borders(Borders::ALL))
-            .style(Style::default().fg(Color::White).bg(Color::Black))
-            .alignment(Alignment::Center)
-            .wrap(Wrap { trim: true });
-
-        f.render_widget(block, f.size());
-    }
-
-    pub fn draw<B: Backend>(&self, history: &History, terminal: &mut Terminal<B>) {
+    pub fn draw<B: Backend>(&self, terminal: &mut Terminal<B>) {
         if cfg!(debug_assertions) && option_env!("RUST_LOG") == Some("debug") {
             return;
         }
@@ -224,9 +266,12 @@ impl TerminalUi {
         terminal
             .draw(|f| {
                 match *self.state.read().unwrap() {
-                    UiState::Spinner(ref title) => self.render_placeholder(title.as_str(), f),
-                    UiState::Connected => {
-                        self.render_dashboard(history, f);
+                    View::Dashboard => {
+                        self.render_dashboard(f);
+                    }
+                    View::Calibrate(ref popup) => {
+                        self.render_dashboard(f);
+                        popup.render(f);
                     }
                 };
             })

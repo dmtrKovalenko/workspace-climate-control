@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use std::ops::{Add, Range};
 use crate::climate_data::ClimateData;
 
 pub struct MaxSizedVector<T, const MAX_SIZE: usize> {
@@ -63,13 +64,42 @@ pub struct History {
     pub co2_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
     pub eco2_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
     pub temperature_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
+    pub temperature_minmax: Option<Range<f32>>,
     pub pressure_history: MaxSizedVector<HistoryPoint, HISTORY_SIZE>,
 }
 
 impl History {
+    fn update_min_max_range<T: Copy + Add + PartialOrd>(
+        value: T,
+        range: &Option<Range<T>>,
+    ) -> Range<T> {
+        // the min and max implemented directly on f32 and f64 instead at the PartialOrd
+        let min = |a: T, b: T| -> T {
+            if a.lt(&b) {
+                a
+            } else {
+                b
+            }
+        };
+
+        let max = |a: T, b: T| -> T {
+            if a.gt(&b) {
+                a
+            } else {
+                b
+            }
+        };
+
+        match range {
+            None => value..value,
+            Some(r) => min(r.start, value)..max(r.end, value),
+        }
+    }
+
     pub fn get_window(&self) -> [f64; 2] {
         self.time_window
     }
+
     pub fn new() -> Self {
         let now = chrono::offset::Local::now().timestamp_millis() as f64;
         Self {
@@ -78,6 +108,7 @@ impl History {
             co2_history: MaxSizedVector::new(),
             eco2_history: MaxSizedVector::new(),
             temperature_history: MaxSizedVector::new(),
+            temperature_minmax: None,
             pressure_history: MaxSizedVector::new(),
         }
     }
@@ -89,6 +120,10 @@ impl History {
         self.flat.push(*climate_data);
         self.temperature_history
             .push((now, climate_data.temperature as f64));
+        self.temperature_minmax = Some(Self::update_min_max_range(
+            climate_data.temperature,
+            &self.temperature_minmax,
+        ));
 
         if let Some(co2) = climate_data.co2 {
             self.co2_history.push((now, co2 as f64));

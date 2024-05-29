@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Style},
@@ -6,51 +7,48 @@ use ratatui::{
     Frame,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Control {
-    Reconnect,
-    Exit,
-    ClearHistory,
-    Calibrate,
-}
+use super::Action;
 
 struct Button {
     label: &'static str,
-    control: Control,
+    control: Action,
     char: char,
 }
 
 const BUTTONS: [Button; 4] = [
     Button {
         label: "Calibrate",
-        control: Control::Calibrate,
+        control: Action::OpenCalibrateCo2Popup,
         char: 'c',
     },
     Button {
         label: "Reconnect",
-        control: Control::Reconnect,
+        control: Action::Reconnect,
         char: 'r',
     },
     Button {
         label: "Clear history",
-        control: Control::ClearHistory,
+        control: Action::ClearHistory,
         char: 'x',
     },
     Button {
         label: "Exit",
-        control: Control::Exit,
+        control: Action::Exit,
         char: 'q',
     },
 ];
 
-pub fn match_button(char: char) -> Option<Control> {
-    BUTTONS.iter().find_map(|button| {
-        if button.char == char {
-            Some(button.control)
-        } else {
-            None
-        }
-    })
+pub fn handle_dashboard_key_event(keycode: KeyCode) -> Option<Action> {
+    match keycode {
+        KeyCode::Char(char) => BUTTONS.iter().find_map(|button| {
+            if button.char == char {
+                Some(button.control)
+            } else {
+                None
+            }
+        }),
+        _ => None,
+    }
 }
 
 pub fn render_buttons(area: Rect, frame: &mut Frame) {

@@ -19,9 +19,9 @@ BH1750 lightSensor(0x23);
 MHZ19 mhZ19;
 
 HardwareSerial mySerial(2);
-
 BleProtocol bleProtocol;
 
+Calibration *calibration;
 void setup() {
   Serial.begin(BAUDRATE);
 
@@ -76,7 +76,8 @@ void setup() {
   };
 
   delay(2000);
-  bleProtocol.setup(pSensors{&mhZ19});
+  calibration = new Calibration({&mhZ19});
+  bleProtocol.setup(calibration);
 }
 
 int last_C02;
@@ -92,7 +93,7 @@ void loop() {
     Serial.print(data.light);
     Serial.println(" lux");
 
-    data.temperature = bmp280.readTemperature() - 8;
+    data.temperature = bmp280.readTemperature();
     Serial.print("BMP280 => Temperature = ");
     Serial.print(data.temperature);
     Serial.print(" °C, ");
@@ -140,6 +141,7 @@ void loop() {
       Serial.println(mhZ19.errorCode);
     }
 
+    calibration->adjustMeasurement(&data);
     bleProtocol.notify(&data, &errorFlags);
     sync_timer = millis();
   }

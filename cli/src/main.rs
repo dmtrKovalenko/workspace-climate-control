@@ -1,3 +1,4 @@
+mod ble_actions;
 mod config;
 mod history;
 mod tui_app;
@@ -13,7 +14,15 @@ use uuid::Uuid;
 mod bluetooth;
 use config::*;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{error::Error, fmt::Display, io::stdout, str::FromStr};
+use std::{
+    error::Error,
+    fmt::Display,
+    io::stdout,
+    str::FromStr,
+    sync::{Arc, RwLock},
+};
+
+use crate::ble_actions::run_ble_mpsc;
 
 mod climate_data;
 mod reactions;
@@ -39,9 +48,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     let backend = CrosstermBackend::new(stdout());
-    let mut history = History::new();
+    let history = Arc::new(RwLock::new(History::new()));
     let mut terminal = Terminal::new(backend)?;
-    let mut app = TerminalUi::new()?;
+    let mut app = TerminalUi::new(Arc::clone(&history))?;
 
     loop {
         let mut spinner_stopped = false;
@@ -49,7 +58,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tracing::debug!("Looking for a sensor...");
         set_terminal_tab_title("Connecting to a sensor...");
 
-        if let Ok(mut connection) = bluetooth::connect_to(
+        if let Ok(connection) = bluetooth::connect_to(
             &BLE_MAIN_SERVICE_LOCAL_NAME,
             Uuid::from_str(&BLE_MAIN_SENSOR_SERVICE)?,
         )
@@ -57,43 +66,46 @@ async fn main() -> Result<(), Box<dyn Error>> {
         {
             stdout().execute(EnterAlternateScreen)?;
             crossterm::terminal::enable_raw_mode()?;
+            let (tx, rx) = tokio::sync::mpsc::channel(100);
+
             // Exit of the app can happen only from the event poller:
-            app.start_event_polling();
+            TerminalUi::start_event_polling(app.state.clone(), tx);
 
-            let result = connection
-                .subscribe(
-                    Uuid::from_str(&BLE_MAIN_SENSOR_STREAM_CHAR)?,
-                    |data: ClimateData| {
-                        tracing::debug!("New climate data: {:?}", data);
-                        if !spinner_stopped {
-                            spinner.stop();
-                            terminal.clear().unwrap();
-                            spinner_stopped = true
-                        }
+            let ble_action_handler = run_ble_mpsc(&connection, rx);
+            let ble_subscription = connection.subscribe(
+                Uuid::from_str(&BLE_MAIN_SENSOR_STREAM_CHAR)?,
+                |data: ClimateData| {
+                    tracing::debug!("New climate data: {:?}", data);
+                    if !spinner_stopped {
+                        spinner.stop();
+                        terminal.clear().unwrap();
+                        spinner_stopped = true
+                    }
 
-                        set_terminal_tab_title(format!(
-                            "T {}°C; CO2 {} ppm; H {}%",
-                            data.temperature,
-                            data.co2.unwrap_or(400),
-                            data.humidity.round()
-                        ));
+                    set_terminal_tab_title(format!(
+                        "T {:.2}°C; CO2 {} ppm; H {}%",
+                        data.temperature,
+                        data.co2.unwrap_or(400),
+                        data.humidity.round()
+                    ));
 
-                        history.capture_measurement(&data);
+                    {
+                        history.write().unwrap().capture_measurement(&data);
+                    }
 
-                        app.capture_measurements(&data);
-                        app.draw(&history, &mut terminal);
+                    app.capture_measurements(&data);
+                    app.draw(&mut terminal);
 
-                        if cfg!(debug_assertions) {
-                            reactions::run_reactions(history.flat.as_slice());
-                        }
-                    },
-                )
-                .await;
+                    if cfg!(debug_assertions) {
+                        reactions::run_reactions(history.read().unwrap().flat.as_slice());
+                    }
+                },
+            );
 
-            match result {
-                Ok(_) => {}
+            match tokio::try_join!(ble_action_handler, ble_subscription) {
+                Ok(_) => (),
                 Err(e) => {
-                    tracing::error!(error=?e, "Error while subscribing to sensor");
+                    tracing::error!("Error in BLE connection: {:?}", e);
                 }
             }
 

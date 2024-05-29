@@ -1,3 +1,4 @@
+#pragma once
 #include <MHZ19.h>
 
 struct ClimateData {
@@ -17,6 +18,6 @@ struct pSensors {
 struct ErrorBitFlags {
   ERRORCODE mhz19;
   bool bmp280 = false;
-  bool bh1750  = false;
+  bool bh1750 = false;
   uint16_t ccs811;
 };

@@ -1,4 +1,4 @@
-use btleplug::api::{Central, CharPropFlags, Manager as _, Peripheral, ScanFilter};
+use btleplug::api::{Central, CharPropFlags, Manager as _, Peripheral, ScanFilter, WriteType};
 use btleplug::platform::Manager;
 use futures::StreamExt;
 use std::error::Error;
@@ -77,7 +77,7 @@ impl<TPer: Peripheral> Connection<TPer> {
     }
 
     pub async fn subscribe<TData: FromBleData, TFun: FnMut(TData)>(
-        &mut self,
+        &self,
         char_uuid: Uuid,
         mut fun: TFun,
     ) -> Result<(), Box<dyn Error>> {
@@ -85,7 +85,7 @@ impl<TPer: Peripheral> Connection<TPer> {
 
         let characteristic = self.try_find_characteristic(char_uuid, CharPropFlags::NOTIFY)?;
         self.peripheral.subscribe(&characteristic).await?;
-        self.subscribed_characteristic = Some(characteristic);
+        //self.subscribed_characteristic = Some(characteristic);
 
         let mut notification_stream = self.peripheral.notifications().await?;
 
@@ -116,6 +116,21 @@ impl<TPer: Peripheral> Connection<TPer> {
 
         let characteristic = self.try_find_characteristic(char_uuid, CharPropFlags::READ)?;
         TData::from_bytes(self.peripheral.read(&characteristic).await?)
+    }
+
+    pub async fn write_to_sennsor(
+        &self,
+        data: &[u8],
+        char_uuid: Uuid,
+    ) -> Result<(), Box<dyn Error>> {
+        tracing::debug!("Writing to sensor");
+
+        let characteristic = self.try_find_characteristic(char_uuid, CharPropFlags::WRITE)?;
+        self.peripheral
+            .write(&characteristic, data, WriteType::WithResponse)
+            .await?;
+
+        Ok(())
     }
 }
 
@@ -184,6 +199,7 @@ pub async fn connect_to(
                         .iter()
                         .any(|service| service.uuid == service_uuid)
                     {
+                        adapter.stop_scan().await?;
                         return Ok(Connection {
                             peripheral,
                             subscribed_characteristic: None,

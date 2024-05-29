@@ -18,8 +18,11 @@ lazy_static! {
     pub static ref BLE_MAIN_SENSOR_STREAM_CHAR: &'static str =
         safe_c_str_to_string(raw_bindings::BLE_MAIN_SENSOR_STREAM_CHAR)
             .expect("Invalid UTF-8 for BLE_MAIN_SENSOR_STREAM_CHAR");
-    pub static ref BLE_MAIN_SENSOR_ACTION_CHAR: &'static str =
-        safe_c_str_to_string(raw_bindings::BLE_MAIN_SENSOR_ACTION_CHAR)
+    pub static ref BLE_MAIN_SENSOR_CO2_CALIBRATION_CHAR: &'static str =
+        safe_c_str_to_string(raw_bindings::BLE_MAIN_SENSOR_CO2_CALIBRATION_CHAR)
+            .expect("Invalid UTF-8 for BLE_MAIN_SENSOR_STREAM_CHAR");
+    pub static ref BLE_MAIN_SENSOR_TEMP_CALIBRATION_CHAR: &'static str =
+        safe_c_str_to_string(raw_bindings::BLE_MAIN_SENSOR_TEMP_CALIBRATION_CHAR)
             .expect("Invalid UTF-8 for BLE_MAIN_SENSOR_ACTION_CHAR");
     pub static ref BLE_MAIN_SENSOR_CALIBRATE_CO2: &'static str =
         safe_c_str_to_string(raw_bindings::BLE_MAIN_SENSOR_CALIBRATE_CO2)

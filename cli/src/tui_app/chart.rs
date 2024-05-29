@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -7,6 +5,7 @@ use ratatui::{
     widgets::{Axis, Block, Borders, Chart, Dataset},
     Frame,
 };
+use std::fmt::Display;
 
 use crate::history::History;
 

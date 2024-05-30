@@ -6,6 +6,7 @@ use btleplug::api::Peripheral;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub enum BleAction {
     CalibrateCo2,
     CalibrateTemperature(i32),

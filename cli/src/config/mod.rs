@@ -2,6 +2,7 @@ use lazy_static::lazy_static;
 use std::error::Error;
 use std::ffi::CStr;
 
+#[allow(dead_code)]
 mod raw_bindings;
 
 fn safe_c_str_to_string(c_str: &'static [u8]) -> Result<&'static str, Box<dyn Error>> {

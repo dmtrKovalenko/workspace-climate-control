@@ -28,7 +28,6 @@ You can have 2 versions of the CO2nsole device. The required minimum components 
 Checkout the following sketch and connect everything as shown in this sketch:
 ![Sketch](docs/sketch.png)
 
-
 For the initial build (no battery) you can connect the 5v directly the the esp32 5v sensor.
 
 Make sure that css811 and bh1750 share the same I2C bus (GPIO21/22). While the MH-Z19 is connected to the 1 hardware UART port of the ESP32 (GPIO16/17).
@@ -83,14 +82,14 @@ For better stability, it is required to install the batter as the CO2 sensor is 
 
 ### Hardware
 
-| Device                 | Description                                                                                                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| FPV Micro 5V 3A        | A compact, high-efficiency power regulator designed for FPV and remote-controlled applications, delivering 5V at 3A to power various components.                     |
-| Bistable Switch Module | These are bistable switch modules that maintain their last state without power consumption, used for turning on/off the power of the device with minimal energy use. |
-| AILAVI 0503V3          | A module known for its precision and efficiency, widely used in diverse electronic applications for reliable performance.                                            |
-| TPS63020               | A buck-boost converter that provides a stable 5V output from a 3.7V LiPo battery, ideal for portable and battery-powered projects.                                   |
+| Device                     | Description                                                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 5V 3A DC-DC Step-Up Module | Amplifies input voltage up to 5v required for the MH-Z19 sensor.                                                                   |
+| AILAVI 0503V3              | A module known for its precision and efficiency, widely used in diverse electronic applications for reiable performance.          |
+| TPS63020                   | A buck-boost converter that provides a stable 5V output from a 3.7V LiPo battery, ideal for portable and battery-powered projects. |
+| 18650 LiPo Battery         | Actually any batter with appropriate voltage will fit correctly, just make sure that the input current is in the safe range.                 |
+| YR-1006 single bond button | A button to turn on/off the device .                                                                                               |
 
-> Note On the AILAVI 0503V3 you can change the controlling register for higher charging current. I recommend to change it to the 135KOhm for the charging current of 1A. 
+> Note On the AILAVI 0503V3 you can change the controlling register for higher charging current. I recommend to change it to the 135KOhm for the charging current of 1A.
 
-![batter schema](./docs/battery-schema.jpg)
-
+![battery schema](./docs/battery-schema.jpg)

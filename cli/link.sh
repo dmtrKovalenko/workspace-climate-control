@@ -3,4 +3,4 @@
 set -euf -o pipefail
 
 cargo build --release
-cp target/release/cli /usr/local/bin/co2
+cp target/release/co2nsole /usr/local/bin/co2

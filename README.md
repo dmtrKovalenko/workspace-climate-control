@@ -85,9 +85,9 @@ For better stability, it is required to install the batter as the CO2 sensor is 
 | Device                     | Description                                                                                                                        |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | 5V 3A DC-DC Step-Up Module | Amplifies input voltage up to 5v required for the MH-Z19 sensor.                                                                   |
-| AILAVI 0503V3              | A module known for its precision and efficiency, widely used in diverse electronic applications for reiable performance.          |
+| AILAVI 0503V3              | A module known for its precision and efficiency, widely used in diverse electronic applications for reiable performance.           |
 | TPS63020                   | A buck-boost converter that provides a stable 5V output from a 3.7V LiPo battery, ideal for portable and battery-powered projects. |
-| 18650 LiPo Battery         | Actually any batter with appropriate voltage will fit correctly, just make sure that the input current is in the safe range.                 |
+| 18650 LiPo Battery         | Actually any batter with appropriate voltage will fit correctly, just make sure that the input current is in the safe range.       |
 | YR-1006 single bond button | A button to turn on/off the device .                                                                                               |
 
 > Note On the AILAVI 0503V3 you can change the controlling register for higher charging current. I recommend to change it to the 135KOhm for the charging current of 1A.

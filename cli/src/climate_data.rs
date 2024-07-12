@@ -1,4 +1,5 @@
 use crate::bluetooth::FromBleData;
+use chrono::TimeZone;
 use serde::Deserialize;
 use std::error::Error;
 
@@ -8,7 +9,7 @@ pub struct Timestamp(f64);
 
 impl Default for Timestamp {
     fn default() -> Self {
-        let now = chrono::offset::Local::now().timestamp_millis() as f64;
+        let now = chrono::Local::now().timestamp_millis() as f64;
         Self(now)
     }
 }
@@ -19,8 +20,10 @@ impl Timestamp {
     }
 
     pub fn format(&self, format_str: &str) -> Option<String> {
-        chrono::NaiveDateTime::from_timestamp_millis(self.0 as i64)
-            .map(|time| time.format(format_str).to_string())
+        let utc_ts = chrono::NaiveDateTime::from_timestamp_millis(self.0 as i64)?;
+
+        let local = chrono::Local.from_utc_datetime(&utc_ts);
+        Some(local.format(format_str).to_string())
     }
 }
 

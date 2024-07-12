@@ -206,7 +206,7 @@ impl DashboardView {
                     bounds: history
                         .temperature_minmax
                         .as_ref()
-                        .map(|r| [(r.start - 3.).floor(), (r.end + 3.).ceil()])
+                        .map(|r| [r.start.floor(), r.start.ceil()])
                         .unwrap_or([0.0, 40.0]),
                     area: horizontal_charts_layout[0],
                     datasets: vec![Dataset::default()
@@ -229,7 +229,7 @@ impl DashboardView {
                         bounds: history
                             .pressure_minmax
                             .as_ref()
-                            .map(|r| [(r.start - 5.).floor(), (r.end + 5.).ceil()])
+                            .map(|r| [r.start.floor(), r.end.ceil()])
                             .unwrap_or([950.0, 1050.0]),
                         area: *pressure_layout,
                         datasets: vec![Dataset::default()

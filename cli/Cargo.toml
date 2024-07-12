@@ -1,6 +1,6 @@
 [package]
 name = "co2nsole"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 description = "CLI for the co2nsole project"
 license = "MIT"

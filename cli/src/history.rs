@@ -1,12 +1,26 @@
 #![allow(dead_code)]
-use crate::climate_data::ClimateData;
+use crate::climate_data::{ClimateData, Timestamp};
 use std::ops::{Add, Range};
 
 pub struct MaxSizedVector<T, const MAX_SIZE: usize> {
     data: Vec<T>,
 }
 
-impl<T, const MAX_SIZE: usize> MaxSizedVector<T, MAX_SIZE> {
+impl<const MAX_SIZE: usize> MaxSizedVector<(Timestamp, f64), MAX_SIZE> {
+    pub fn as_ratatui_dataset(&self) -> &[(f64, f64)] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self.data.as_slice().as_ptr() as *const (f64, f64),
+                self.data.len(),
+            )
+        }
+    }
+}
+
+impl<T, const MAX_SIZE: usize> MaxSizedVector<T, MAX_SIZE>
+where
+    T: Copy,
+{
     /// Constructs a new MaxSizedVector with a specified maximum size
     pub fn new() -> Self {
         Self {
@@ -50,13 +64,20 @@ impl<T, const MAX_SIZE: usize> MaxSizedVector<T, MAX_SIZE> {
     pub fn as_slice(&self) -> &[T] {
         self.data.as_slice()
     }
+
+    pub fn get_window<Return, MapFn: Fn(&T) -> Return>(&self, map: MapFn) -> Option<[Return; 2]> {
+        let first = self.data.first()?;
+        let last = self.data.last()?;
+
+        Some([map(first), map(last)])
+    }
 }
 
 // amount of 5 seconds intervals in 24 hours
 const HISTORY_SIZE: usize = 17280;
 
 /// .0 - timestamp, .1 - value
-type HistoryPoint = (f64, f64);
+type HistoryPoint = (Timestamp, f64);
 
 pub struct History {
     time_window: [f64; 2],
@@ -98,10 +119,6 @@ impl History {
         }
     }
 
-    pub fn get_window(&self) -> [f64; 2] {
-        self.time_window
-    }
-
     pub fn new() -> Self {
         let now = chrono::offset::Local::now().timestamp_millis() as f64;
         Self {
@@ -118,25 +135,24 @@ impl History {
     }
 
     pub fn capture_measurement(&mut self, climate_data: &ClimateData) {
-        let now = chrono::offset::Local::now().timestamp_millis() as f64;
-        self.time_window[1] = now;
         self.latest_climate_data = Some(*climate_data);
+        let ts = climate_data.timestamp;
 
         self.flat.push(*climate_data);
         self.temperature_history
-            .push((now, climate_data.temperature as f64));
+            .push((ts, climate_data.temperature as f64));
         self.temperature_minmax = Some(Self::update_min_max_range(
             climate_data.temperature as f64,
             &self.temperature_minmax,
         ));
 
         if let Some(co2) = climate_data.co2 {
-            self.co2_history.push((now, co2 as f64));
+            self.co2_history.push((ts, co2 as f64));
         }
 
-        self.eco2_history.push((now, climate_data.eco2 as f64));
+        self.eco2_history.push((ts, climate_data.eco2 as f64));
         self.pressure_history
-            .push((now, climate_data.pressure as f64));
+            .push((ts, climate_data.pressure as f64));
         self.pressure_minmax = Some(Self::update_min_max_range(
             climate_data.pressure as f64,
             &self.pressure_minmax,

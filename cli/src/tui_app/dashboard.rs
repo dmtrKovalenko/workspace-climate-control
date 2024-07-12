@@ -159,7 +159,6 @@ impl DashboardView {
 
         if let Some(co2_layout) = main_layout.get(1) {
             render_chart(
-                history,
                 f,
                 ChartOptions {
                     unit_of_measurement: "ppm",
@@ -168,17 +167,18 @@ impl DashboardView {
                     color: Color::Cyan,
                     bounds: [400.0, 2000.],
                     area: *co2_layout,
+                    window: history.eco2_history.get_window(|(ts, _)| *ts),
                     datasets: vec![
                         Dataset::default()
                             .name("eCO2 ppm")
                             .marker(symbols::Marker::Braille)
                             .style(Style::default().fg(Color::Gray))
-                            .data(history.eco2_history.as_slice()),
+                            .data(history.eco2_history.as_ratatui_dataset()),
                         Dataset::default()
                             .name("CO2 ppm")
                             .marker(symbols::Marker::Braille)
                             .style(Style::default().fg(Color::Cyan))
-                            .data(history.co2_history.as_slice()),
+                            .data(history.co2_history.as_ratatui_dataset()),
                     ],
                 },
             );
@@ -196,13 +196,13 @@ impl DashboardView {
                 .split(*horizontal_layout);
 
             render_chart(
-                history,
                 f,
                 ChartOptions {
                     unit_of_measurement: "°C",
                     label: "Temperature",
                     current_measure: Some(latest_climate_data.temperature),
                     color: Color::LightRed,
+                    window: history.temperature_history.get_window(|(ts, _)| *ts),
                     bounds: history
                         .temperature_minmax
                         .as_ref()
@@ -213,19 +213,19 @@ impl DashboardView {
                         .name("°C")
                         .marker(symbols::Marker::Braille)
                         .style(Style::default().fg(Color::LightRed))
-                        .data(history.temperature_history.as_slice())],
+                        .data(history.temperature_history.as_ratatui_dataset())],
                 },
             );
 
             if let Some(pressure_layout) = horizontal_charts_layout.get(1) {
                 render_chart(
-                    history,
                     f,
                     ChartOptions {
                         unit_of_measurement: "hPa",
                         current_measure: Some(latest_climate_data.pressure),
                         label: "Atmospheric Pressure",
                         color: Color::Blue,
+                        window: history.pressure_history.get_window(|(ts, _)| *ts),
                         bounds: history
                             .pressure_minmax
                             .as_ref()
@@ -236,7 +236,7 @@ impl DashboardView {
                             .name("hectoPascals")
                             .marker(symbols::Marker::Bar)
                             .style(Style::default().fg(Color::Blue))
-                            .data(history.pressure_history.as_slice())],
+                            .data(history.pressure_history.as_ratatui_dataset())],
                     },
                 );
             }

@@ -1,3 +1,4 @@
+use crate::climate_data::Timestamp;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -7,8 +8,6 @@ use ratatui::{
 };
 use std::fmt::Display;
 
-use crate::history::History;
-
 pub struct ChartOptions<'a, TMeasure: Display> {
     pub unit_of_measurement: &'static str,
     pub label: &'static str,
@@ -16,14 +15,11 @@ pub struct ChartOptions<'a, TMeasure: Display> {
     pub color: Color,
     pub datasets: Vec<Dataset<'a>>,
     pub bounds: [f64; 2],
+    pub window: Option<[Timestamp; 2]>,
     pub area: Rect,
 }
 
-pub fn render_chart<'a, TMeasure: Display>(
-    history: &'a History,
-    frame: &mut Frame,
-    opts: ChartOptions<'a, TMeasure>,
-) {
+pub fn render_chart<TMeasure: Display>(frame: &mut Frame, opts: ChartOptions<TMeasure>) {
     let ChartOptions {
         area,
         bounds,
@@ -32,16 +28,16 @@ pub fn render_chart<'a, TMeasure: Display>(
         label,
         unit_of_measurement,
         current_measure,
+        window,
     } = opts;
+    let window = window.unwrap_or([Timestamp::default(), Timestamp::default()]);
 
-    let window = history.get_window();
-    let start_time = chrono::NaiveDateTime::from_timestamp_millis(window[0] as i64)
-        .map(|time| time.format("%H:%M:%S").to_string())
+    let start_time = window[0]
+        .format("%H:%M:%S")
         .unwrap_or("first measurement".to_string());
-
-    let end_time = chrono::NaiveDateTime::from_timestamp_millis(window[1] as i64)
-        .map(|time| time.format("%H:%M:%S").to_string())
-        .unwrap_or("now".to_string());
+    let end_time = window[1]
+        .format("%H:%M:%S")
+        .unwrap_or("first measurement".to_string());
 
     let x_labels = vec![
         Span::styled(
@@ -76,7 +72,7 @@ pub fn render_chart<'a, TMeasure: Display>(
                 .title("time")
                 .style(Style::default().fg(Color::Gray))
                 .labels(x_labels)
-                .bounds(window),
+                .bounds([window[0].as_f64(), window[1].as_f64()]),
         )
         .y_axis(
             Axis::default()

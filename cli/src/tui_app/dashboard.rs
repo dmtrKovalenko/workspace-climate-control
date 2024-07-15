@@ -206,7 +206,7 @@ impl DashboardView {
                     bounds: history
                         .temperature_minmax
                         .as_ref()
-                        .map(|r| [r.start.floor(), r.start.ceil()])
+                        .map(|r| [r.start.floor(), r.end.ceil()])
                         .unwrap_or([0.0, 40.0]),
                     area: horizontal_charts_layout[0],
                     datasets: vec![Dataset::default()
@@ -226,17 +226,35 @@ impl DashboardView {
                         label: "Atmospheric Pressure",
                         color: Color::Blue,
                         window: history.pressure_history.get_window(|(ts, _)| *ts),
-                        bounds: history
-                            .pressure_minmax
-                            .as_ref()
-                            .map(|r| [r.start.floor(), r.end.ceil()])
-                            .unwrap_or([950.0, 1050.0]),
+                        bounds: {
+                            let range = history
+                                .pressure_minmax
+                                .as_ref()
+                                .cloned()
+                                .unwrap_or(950.0..1020.0);
+
+                            [range.start.min(1000.0), range.end.max(1020.0)]
+                        },
                         area: *pressure_layout,
-                        datasets: vec![Dataset::default()
-                            .name("hectoPascals")
-                            .marker(symbols::Marker::Bar)
-                            .style(Style::default().fg(Color::Blue))
-                            .data(history.pressure_history.as_ratatui_dataset())],
+                        datasets: vec![
+                            Dataset::default()
+                                .name("Normal Pressure")
+                                .marker(symbols::Marker::Dot)
+                                .style(Style::default().fg(Color::LightGreen))
+                                .data(
+                                    &history
+                                        .pressure_history
+                                        .as_ratatui_dataset()
+                                        .iter()
+                                        .map(|(ts, _)| (*ts, 1013.25f64))
+                                        .collect::<Vec<_>>(),
+                                ),
+                            Dataset::default()
+                                .name("hectoPascals")
+                                .marker(symbols::Marker::HalfBlock)
+                                .style(Style::default().fg(Color::Blue))
+                                .data(history.pressure_history.as_ratatui_dataset()),
+                        ],
                     },
                 );
             }

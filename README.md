@@ -12,25 +12,25 @@ Welcome to CO2nsole, an innovative open-source project aimed at providing an env
 - **CLI for TUI**: Intuitive command-line interface to interact with the device via a text-based user interface.
 - **Embeddable Solutions**: Flexible design for integrating CO2nsole functionality into different target environments.
 - **Real-Time Monitoring**: Monitor CO2 levels in real-time with accurate and responsive readings.
-- **Open-Source**: Freedom to modify, enhance, and distribute the application as per your needs.
+- **Open-Source**: Freedom to modify, enhance, and distribute the application as you need. 
 
 ## Building
 
-You can have 2 versions of the CO2nsole device. The required minimum components for the basic no-battery versions are:
+You can have 2 versions of the CO2nsole device: with or without a battery. The required minimum components for the basic no-battery versions are:
 
 | Sensor                     | Description                                                                                                                                                                                                  |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ![ESP32](docs/esp32.png)   | The ESP32 is a versatile microcontroller featuring dual-core CPUs and built-in Wi-Fi and Bluetooth capabilities, having enough power to maintain all the sensors work and the BLE and Network based syncing. |
 | ![MH-Z19](docs/mhz19.png)  | The MH-Z19 is a carbon dioxide sensor that measures CO2 levels in the air using non-dispersive infrared (NDIR) technology, ideal for indoor air quality monitoring.                                          |
-| ![CCS811](docs/css811.png) | The CCS811 is an air quality sensor capable of detecting volatile organic compounds (VOCs) and CO2, making it suitable for monitoring indoor environments.                                                   |
-| ![BH1750](docs/bh1750.png) | The BH1750 is a digital light intensity sensor that provides measurements in lux, which helps in adjusting lighting conditions in applications like smart buildings.                                         |
+| ![CCS811](docs/css811.png) | The CCS811 is a combination of temperature, humudity, and an air quality sensor capable of detecting volatile organic compounds (VOCs) and CO2, making it suitable for monitoring indoor environments.                                                   |
+| ![BH1750](docs/bh1750.png) | The BH1750 is a digital light intensity sensor that provides measurements in lux.                                         |
 
 Checkout the following sketch and connect everything as shown in this sketch:
 ![Sketch](docs/sketch.png)
 
-For the initial build (no battery) you can connect the 5v directly the the esp32 5v sensor.
+For the initial build (no battery) you can connect the 5v directly the the esp32 5v pin.
 
-Make sure that css811 and bh1750 share the same I2C bus (GPIO21/22). While the MH-Z19 is connected to the 1 hardware UART port of the ESP32 (GPIO16/17).
+Make sure that css811 and bh1750 share the same I2C bus (GPIO21/22). While the MH-Z19 is connected to the 1 hardware UART port of the ESP32 (GPIO 16/17).
 
 ### Firmware
 
@@ -78,7 +78,9 @@ It is required to run Bluetooth for your terminal emulator. You can do this by g
 
 ## Adding battery
 
-For better stability, it is required to install the batter as the CO2 sensor is designed to be always on for better calibration and more stable results. Here is a an schema of the battery that might be used:
+For better stability, it is recommended to install the battery as the CO2 sensor is designed to be always on for better calibration and more stable results. Any 18650 batter will work fine, I used a very old one from Olympus camera.
+
+Here is a a schema of the battery connection:
 
 ### Hardware
 

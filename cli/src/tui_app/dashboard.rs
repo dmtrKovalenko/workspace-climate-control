@@ -116,7 +116,7 @@ impl DashboardView {
         f.render_widget(paragraph, area);
     }
     pub fn render_dashboard(history: &History, f: &mut Frame) {
-        let size = f.size();
+        let size = f.area();
 
         let latest_climate_data = if let Some(latest_climate_data) = history.latest_climate_data {
             latest_climate_data

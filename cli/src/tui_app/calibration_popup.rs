@@ -147,7 +147,7 @@ impl CalibrationPopup {
             .border_style(Style::default().fg(Color::Black))
             .style(Style::default().bg(Color::DarkGray));
 
-        let area = centered_rect(60, 25, f.size());
+        let area = centered_rect(60, 25, f.area());
         f.render_widget(Clear, area);
         f.render_widget(popup_block, area);
 

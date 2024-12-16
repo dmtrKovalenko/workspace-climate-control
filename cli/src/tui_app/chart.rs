@@ -80,11 +80,11 @@ pub fn render_chart<TMeasure: Display>(frame: &mut Frame, opts: ChartOptions<TMe
                 .style(Style::default().fg(Color::Gray))
                 .labels(vec![
                     Span::styled(
-                        bounds[0].to_string(),
+                        format!("{:.0}", bounds[0]),
                         Style::default().add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(
-                        bounds[1].to_string(),
+                        format!("{:.0}", bounds[1]),
                         Style::default().add_modifier(Modifier::BOLD),
                     ),
                 ])

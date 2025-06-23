@@ -1,6 +1,6 @@
 # CO2nsole
 
-Welcome to CO2nsole, an innovative open-source project aimed at providing an environmental monitoring device that measures CO2 levels and all the other microclimate information in a private open and efficient way. This repository contains all the resources necessary to build the CO2nsole device, as well as a CLI library for a Text-based User Interface (TUI) library, making it highly embeddable into other projects or targets.
+Welcome to CO2nsole, open-source project aimed at providing an workstation climate  device that measures CO2 levels and all the other microclimate information in a private, open and efficient way. This repository contains all the resources necessary to build the CO2nsole device, as well as a CLI library for a Text-based User Interface (TUI) library, making it highly embeddable into other projects or targets.
 
 | Device                      | Software                           |
 | --------------------------- | ---------------------------------- |
@@ -22,7 +22,7 @@ You can have 2 versions of the CO2nsole device: with or without a battery. The r
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ![ESP32](docs/esp32.png)   | The ESP32 is a versatile microcontroller featuring dual-core CPUs and built-in Wi-Fi and Bluetooth capabilities, having enough power to maintain all the sensors work and the BLE and Network based syncing. |
 | ![MH-Z19](docs/mhz19.png)  | The MH-Z19 is a carbon dioxide sensor that measures CO2 levels in the air using non-dispersive infrared (NDIR) technology, ideal for indoor air quality monitoring.                                          |
-| ![CCS811](docs/css811.png) | The CCS811 is a combination of temperature, humudity, and an air quality sensor capable of detecting volatile organic compounds (VOCs) and CO2, making it suitable for monitoring indoor environments.                                                   |
+| ![CCS811](docs/css811.png) | The CCS811 is a combination of temperature, humudity, and an air quality sensor capable of detecting volatile organic compounds (VOCs) and CO2.                                                   |
 | ![BH1750](docs/bh1750.png) | The BH1750 is a digital light intensity sensor that provides measurements in lux.                                         |
 
 Checkout the following sketch and connect everything as shown in this sketch:
@@ -72,6 +72,13 @@ Or it is also possible to install the CLI using cargo:
 cargo install --locked co2nsole
 ```
 
+### Calibration
+
+You can calibrate both CO2 and temperature level.
+
+* To perform CO2 calibration (you should do it on the very start): get the sensor out to the fresh air for 20 minutes and send the calibration command
+* Temperature calibration is used using software by entering the current temperature (can be checked on other termostat)
+
 #### MacOS note
 
 It is required to run Bluetooth for your terminal emulator. You can do this by going to System Preferences -> Security & Privacy -> Privacy -> Bluetooth and checking your terminal emulator.
@@ -87,9 +94,9 @@ Here is a a schema of the battery connection:
 | Device                     | Description                                                                                                                        |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | 5V 3A DC-DC Step-Up Module | Amplifies input voltage up to 5v required for the MH-Z19 sensor.                                                                   |
-| AILAVI 0503V3              | A module known for its precision and efficiency, widely used in diverse electronic applications for reiable performance.           |
-| TPS63020                   | A buck-boost converter that provides a stable 5V output from a 3.7V LiPo battery, ideal for portable and battery-powered projects. |
-| 18650 LiPo Battery         | Actually any batter with appropriate voltage will fit correctly, just make sure that the input current is in the safe range.       |
+| AILAVI 0503V3              | A USB-C charging input for the battery.           |
+| TPS63020                   | A buck-boost converter that provides a stable 5V output from a 3.7V LiPo battery. |
+| 18650 LiPo Battery         | Actually any battery with appropriate voltage will fit correctly, just make sure that the input current is in the safe range.       |
 | YR-1006 single bond button | A button to turn on/off the device .                                                                                               |
 
 > Note On the AILAVI 0503V3 you can change the controlling register for higher charging current. I recommend to change it to the 135KOhm for the charging current of 1A.

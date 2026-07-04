@@ -12,7 +12,7 @@ Welcome to CO2nsole, open-source project aimed at providing an workstation clima
 - **CLI for TUI**: Intuitive command-line interface to interact with the device via a text-based user interface.
 - **Embeddable Solutions**: Flexible design for integrating CO2nsole functionality into different target environments.
 - **Real-Time Monitoring**: Monitor CO2 levels in real-time with accurate and responsive readings.
-- **Open-Source**: Freedom to modify, enhance, and distribute the application as you need. 
+- **Prometheus Events**: Can create prometheus events 
 
 ## Building
 
@@ -82,6 +82,34 @@ You can calibrate both CO2 and temperature level.
 #### MacOS note
 
 It is required to run Bluetooth for your terminal emulator. You can do this by going to System Preferences -> Security & Privacy -> Privacy -> Bluetooth and checking your terminal emulator.
+
+## Grafana dashboards
+
+Beyond the local TUI, the ESP32 firmware can fan out every climate metric directly to a [Grafana Cloud](https://grafana.com/products/cloud/) Prometheus endpoint over WiFi, so you can watch trends from anywhere and keep long-term history.
+
+![Grafana dashboard](docs/grafana-dashboard.png)
+
+### Enabling it
+
+Prometheus remote-write is compiled in automatically once you provide credentials:
+
+1. Copy `shared/conf.local.example.h` to `shared/conf.local.h` (gitignored) and fill in your WiFi SSID/password and Grafana Cloud remote-write URL, instance ID and API token.
+2. Reflash the firmware: `cd core && pio run -t upload`.
+
+The firmware auto-derives the feature flag from the presence of `PROM_GC_URL`; without `conf.local.h` you get the plain BLE-only build. WiFi and BLE run side by side, so the CLI keeps working while metrics are pushed every 60 s.
+
+### Dashboards
+
+Import these into Grafana via **Dashboards -> Import** both
+
+- `dashboards/co2nsole.json` - the climate dashboard shown above (CO2, temperature, humidity, air quality, pressure, light).
+- `dashboards/co2nsole-health.json` - device reliability diagnostics (uptime, free heap, WiFi RSSI, send-failure rate).
+
+The `Device` variable at the top lets you filter by unit when running more than one sensor.
+
+### Alerts
+
+There is no prebuild configuration but just FYI graphana provides alerting functionality, so you can make it send you Telegram/Slack message if the CO2 level or Temperature level is too high. Or even create automation via webhooks to start your AC automatically overnight.
 
 ## Adding battery
 

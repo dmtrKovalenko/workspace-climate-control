@@ -4,6 +4,7 @@
 #include "ble.cpp"
 #include "ccs811.h"
 #include "i2c_scanner.h"
+#include "prometheus.h"
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <BH1750.h>
@@ -21,9 +22,23 @@ MHZ19 mhZ19;
 HardwareSerial mySerial(2);
 BleProtocol bleProtocol;
 
+#if ENABLE_PROMETHEUS
+#include <esp_task_wdt.h>
+PrometheusReporter prometheus;
+#endif
+
 Calibration *calibration;
 void setup() {
   Serial.begin(BAUDRATE);
+
+#if ENABLE_PROMETHEUS
+  // Task watchdog, armed FIRST so a wedge anywhere in setup() (sensor retry
+  // loops, WiFi/NTP waits) reboots instead of hanging forever with BLE dead.
+  // Everything below is bounded well under the budget: WiFi <=15 s, NTP
+  // <=30 s, sensor init a few seconds.
+  esp_task_wdt_init(PROM_WDT_TIMEOUT_S, true);
+  esp_task_wdt_add(NULL);
+#endif
 
   Serial.println("DHT22 Temperature and Humidity Sensor");
   Serial.println("------------------------------------");
@@ -77,6 +92,18 @@ void setup() {
 
   delay(2000);
   calibration = new Calibration({&mhZ19});
+
+#if ENABLE_PROMETHEUS
+  // Bring WiFi/NTP/TLS up *before* BLEDevice::init: BLE allocates a sizable
+  // chunk of heap and starting it second leaves Prometheus in a less
+  // fragmented address space. begin() is bounded — if WiFi or NTP is
+  // unavailable it defers and maybeInit() retries from loop().
+  if (!prometheus.begin()) {
+    Serial.print("Prometheus not started: ");
+    Serial.println(prometheus.lastError());
+  }
+#endif
+
   bleProtocol.setup(calibration);
 }
 
@@ -84,6 +111,9 @@ int last_C02;
 unsigned long sync_timer = 0;
 
 void loop() {
+#if ENABLE_PROMETHEUS
+  esp_task_wdt_reset();
+#endif
   if (millis() - sync_timer > 2000) {
     ErrorBitFlags errorFlags;
     ClimateData data;
@@ -143,6 +173,11 @@ void loop() {
 
     calibration->adjustMeasurement(&data);
     bleProtocol.notify(&data, &errorFlags);
+#if ENABLE_PROMETHEUS
+    prometheus.maybeInit(); // retries deferred init; no-op once running
+    prometheus.capture(data);
+    prometheus.maybeSend();
+#endif
     sync_timer = millis();
   }
 }

@@ -5,3 +5,4 @@ target/
 compile_commands.json
 .cache/
 .env*
+shared/conf.local.h
